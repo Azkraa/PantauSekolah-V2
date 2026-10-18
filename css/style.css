@@ -1,0 +1,196 @@
+/* ==========================================================================
+   PantauSekolah - Custom Stylesheet (Warm Beige Edition)
+   ========================================================================== */
+
+:root {
+    --bg-beige: #F6F3EC;
+    --bg-beige-subtle: #FAF8F5;
+    --bg-beige-header: #EFE9DC;
+    --border-beige: #E8E2D5;
+    --border-beige-light: #F0EBE1;
+    --text-primary: #1E293B;
+    --text-secondary: #475569;
+}
+
+body {
+    font-family: 'Poppins', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background-color: var(--bg-beige);
+    color: var(--text-primary);
+}
+
+/* Beige theme helpers */
+.bg-beige-main {
+    background-color: #F6F3EC;
+}
+
+.bg-beige-card {
+    background-color: #FFFFFF;
+}
+
+.bg-beige-header {
+    background-color: #EFE9DC;
+}
+
+.border-beige-custom {
+    border-color: #E8E2D5;
+}
+
+.border-beige-light {
+    border-color: #F0EBE1;
+}
+
+.hover-beige-row:hover {
+    background-color: #FAF7F0 !important;
+}
+
+/* Glassmorphism with warm tint */
+.glass-effect {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+}
+
+.dark-glass {
+    background: rgba(26, 28, 34, 0.88);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+}
+
+/* Custom Scrollbar - Warm styled */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #EFE9DC;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #CFC5B4;
+    border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #B5A994;
+}
+
+/* Table Enhancements */
+.custom-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.custom-table th {
+    background-color: #EFE9DC;
+    color: #453424;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    padding: 0.85rem 1rem;
+    border-bottom: 2px solid #E0D7C5;
+}
+
+.custom-table td {
+    padding: 0.85rem 1rem;
+    vertical-align: middle;
+    border-bottom: 1px solid #F0EBE1;
+    font-size: 0.78rem;
+}
+
+.custom-table tbody tr {
+    transition: background-color 0.15s ease-in-out;
+}
+
+.custom-table tbody tr:hover {
+    background-color: #FAF7F0;
+}
+
+.custom-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Smooth Transitions */
+.smooth-transition {
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Card hover glow */
+.card-hover {
+    transition: all 0.2s ease-in-out;
+}
+
+.card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(69, 52, 36, 0.07), 0 8px 10px -6px rgba(69, 52, 36, 0.04);
+}
+
+/* ==========================================================================
+   Sidebar & Navigation Refinements
+   ========================================================================== */
+.sidebar-nav-btn {
+    outline: none !important;
+    position: relative;
+    border: 1px solid transparent;
+    transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-nav-btn:focus,
+.sidebar-nav-btn:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+.sidebar-nav-btn:hover:not(.nav-active) {
+    background-color: rgba(255, 255, 255, 0.06);
+    color: #FFFFFF !important;
+    transform: translateX(2px);
+}
+
+.sidebar-nav-btn:hover:not(.nav-active) .nav-icon-box {
+    background-color: rgba(255, 255, 255, 0.14) !important;
+    color: #FFFFFF !important;
+}
+
+/* Active Nav Indicator */
+.nav-active {
+    background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%) !important;
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
+    box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.35) !important;
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+}
+
+.nav-active .nav-icon-box {
+    background-color: rgba(255, 255, 255, 0.22) !important;
+    color: #FFFFFF !important;
+}
+
+.nav-active i,
+.nav-active span {
+    color: #FFFFFF !important;
+}
+
+/* Mobile responsive horizontal scroll container */
+.table-scroll-container {
+    position: relative;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    border-radius: inherit;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+    .custom-table th {
+        padding: 0.7rem 0.75rem;
+        font-size: 0.65rem;
+    }
+    .custom-table td {
+        padding: 0.7rem 0.75rem;
+        font-size: 0.72rem;
+    }
+}

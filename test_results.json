@@ -1,0 +1,200 @@
+[
+  {
+    "id": "TC-01",
+    "name": "Tampilan Form Login Murni",
+    "role": "Guest",
+    "expected": "Menampilkan form login bersih, input username & password, dan brand PantauSekolah",
+    "actual": "Form login tampil responsif dengan layout elegan dan field siap diisi",
+    "status": "PASSED",
+    "screenshotFile": "01_login_screen.png"
+  },
+  {
+    "id": "TC-02",
+    "name": "Validasi Form Login Kosong",
+    "role": "Guest",
+    "expected": "Muncul notifikasi peringatan harap masukkan username dan password",
+    "actual": "Peringatan validasi form kosong muncul dengan aman (Toast Error)",
+    "status": "PASSED",
+    "screenshotFile": "02_login_empty_toast.png"
+  },
+  {
+    "id": "TC-03",
+    "name": "Penolakan Kredensial Tidak Valid",
+    "role": "Guest",
+    "expected": "Aplikasi menolak kredensial salah dan menampilkan notifikasi kesalahan",
+    "actual": "Kredensial salah berhasil ditolak oleh server dengan pesan informatif",
+    "status": "PASSED",
+    "screenshotFile": "03_login_failed_toast.png"
+  },
+  {
+    "id": "TC-04",
+    "name": "Login Berhasil Role Pengawas",
+    "role": "Pengawas",
+    "expected": "Pengguna masuk ke dashboard utama dengan hak akses penuh Pengawas",
+    "actual": "Berhasil masuk ke Dashboard dengan data statistik dan grafik laporan termuat",
+    "status": "PASSED",
+    "screenshotFile": "04_dashboard_pengawas.png"
+  },
+  {
+    "id": "TC-05",
+    "name": "Navigasi ke Modul Audit Log",
+    "role": "Pengawas",
+    "expected": "Halaman menampilkan modul Audit Log Aktivitas Pengguna",
+    "actual": "Modul Audit Log termuat lengkap beserta riwayat aktivitas pengguna",
+    "status": "PASSED",
+    "screenshotFile": "05_audit_log_module.png"
+  },
+  {
+    "id": "TC-06",
+    "name": "Preservasi Modul Aktif Saat Refresh (Anti Reset)",
+    "role": "Pengawas",
+    "expected": "Setelah refresh (F5), aplikasi tetap membuka modul Audit Log tanpa kembali ke Dashboard",
+    "actual": "Aplikasi secara tepat mempertahankan modul Audit Log dan tidak mereset ke Dashboard",
+    "status": "PASSED",
+    "screenshotFile": "06_audit_log_after_refresh.png"
+  },
+  {
+    "id": "TC-07",
+    "name": "Modul Laporan Kepala Sekolah (Pengawas)",
+    "role": "Pengawas",
+    "expected": "Menampilkan folder kartu laporan dari seluruh sekolah binaan",
+    "actual": "Daftar folder sekolah binaan tampil dengan status dan tautan Drive",
+    "status": "PASSED",
+    "screenshotFile": "07_laporan_kepsek_pengawas.png"
+  },
+  {
+    "id": "TC-08",
+    "name": "Modul Laporan Guru (Pengawas)",
+    "role": "Pengawas",
+    "expected": "Menampilkan folder laporan guru per sekolah",
+    "actual": "Folder sekolah untuk laporan guru tampil lengkap dengan statistik berkas",
+    "status": "PASSED",
+    "screenshotFile": "08_laporan_guru_pengawas.png"
+  },
+  {
+    "id": "TC-09",
+    "name": "Eksplorasi Subfolder Guru Sekolah Binaan",
+    "role": "Pengawas",
+    "expected": "Menampilkan kartu subfolder dokumen guru di sekolah yang dipilih",
+    "actual": "Subfolder RPP / Modul Pembelajaran tampil rapi dalam card grid tanpa overflow",
+    "status": "PASSED",
+    "screenshotFile": "09_subfolder_guru_karyabangsa.png"
+  },
+  {
+    "id": "TC-10",
+    "name": "Modul Folder Dokumen Sekolah & Switcher",
+    "role": "Pengawas",
+    "expected": "Menampilkan arsip sekolah terpilih dengan pill switcher antar-sekolah",
+    "actual": "Tampilan dedicated folder dokumen sekolah dan switcher sekolah berfungsi baik",
+    "status": "PASSED",
+    "screenshotFile": "10_folder_dokumen_sekolah_pengawas.png"
+  },
+  {
+    "id": "TC-11",
+    "name": "Modul User Manager Pengawas",
+    "role": "Pengawas",
+    "expected": "Menampilkan seluruh daftar akun (Pengawas, Kepsek, Guru) dengan kontrol status",
+    "actual": "Tabel manajemen pengguna tampil lengkap beserta modal tambah pengguna",
+    "status": "PASSED",
+    "screenshotFile": "11_user_manager_pengawas.png"
+  },
+  {
+    "id": "TC-12",
+    "name": "Modul Drive Manager Pengawas",
+    "role": "Pengawas",
+    "expected": "Menampilkan daftar folder Drive per sekolah dan tombol buat folder massal/spesifik",
+    "actual": "Manajemen Google Drive termuat dengan struktur folder sekolah binaan",
+    "status": "PASSED",
+    "screenshotFile": "12_drive_manager_pengawas.png"
+  },
+  {
+    "id": "TC-13",
+    "name": "Modal Konfirmasi Logout Pengganti Confirm()",
+    "role": "Pengawas",
+    "expected": "Muncul dialog konfirmasi interaktif elegan dengan tombol Ya dan Batal",
+    "actual": "Modal konfirmasi tampil elegan dengan penanganan keyboard (Enter/Esc)",
+    "status": "PASSED",
+    "screenshotFile": "13_modal_konfirmasi_logout.png"
+  },
+  {
+    "id": "TC-14",
+    "name": "Restriksi Akses Menu Kepala Sekolah",
+    "role": "Kepala Sekolah",
+    "expected": "Menu User Manager, Drive Manager, Audit Log disembunyikan. Guru Manager & Upload terbuka.",
+    "actual": "Menu terisolasi dengan aman sesuai hak akses Kepala Sekolah",
+    "status": "PASSED",
+    "screenshotFile": "14_dashboard_kepala_sekolah.png"
+  },
+  {
+    "id": "TC-15",
+    "name": "Isolasi Data Sekolah (Kepala Sekolah)",
+    "role": "Kepala Sekolah",
+    "expected": "Kepala Sekolah HANYA melihat data SD Karya Bangsa, tidak melihat sekolah lain",
+    "actual": "Data sekolah lain terisolasi dengan sempurna (SD Karya Bangsa only)",
+    "status": "PASSED",
+    "screenshotFile": "15_folder_sekolah_kepsek_isolated.png"
+  },
+  {
+    "id": "TC-16",
+    "name": "Modul Pendaftaran Guru oleh Kepala Sekolah",
+    "role": "Kepala Sekolah",
+    "expected": "Kepala Sekolah dapat mendaftarkan akun guru dan folder Drive otomatis",
+    "actual": "Modul registrasi guru siap dengan form dan pembuatan Drive otomatis",
+    "status": "PASSED",
+    "screenshotFile": "16_guru_manager_kepsek.png"
+  },
+  {
+    "id": "TC-17",
+    "name": "Restriksi Hak Akses Role Guru",
+    "role": "Guru",
+    "expected": "Guru hanya memiliki akses ke Dashboard, Folder Laporan Guru, dan Unggah Laporan",
+    "actual": "Navigasi role Guru terproteksi ketat dan aman",
+    "status": "PASSED",
+    "screenshotFile": "17_dashboard_guru.png"
+  },
+  {
+    "id": "TC-18",
+    "name": "Tampilan Folder Laporan Guru (Direct School)",
+    "role": "Guru",
+    "expected": "Guru langsung diarahkan ke folder sekolahnya tanpa tombol kembali ke daftar sekolah lain",
+    "actual": "Folder langsung berfokus pada sekolah guru bersangkutan tanpa tombol back",
+    "status": "PASSED",
+    "screenshotFile": "18_folder_laporan_guru_view.png"
+  },
+  {
+    "id": "TC-19",
+    "name": "Dukungan Berkas Multi-Format (Excel, Word, Docs, PDF, JPG, PNG)",
+    "role": "Guru / Kepsek",
+    "expected": "Form unggah menerima format .pdf, .doc, .docx, .xls, .xlsx, .csv, .jpg, .jpeg, .png",
+    "actual": "Seluruh format dokumen Office, PDF, dan Gambar telah didukung 100%",
+    "status": "PASSED",
+    "screenshotFile": "19_form_unggah_multi_format.png"
+  },
+  {
+    "id": "TC-20",
+    "name": "Tampilan Responsif Mobile Smartphone",
+    "role": "All Roles",
+    "expected": "Layout menyesuaikan layar ponsel secara fleksibel tanpa horizontal scroll",
+    "actual": "Tampilan dashboard mobile rapi, card statistik stack vertikal adaptif",
+    "status": "PASSED",
+    "screenshotFile": "20_mobile_dashboard_view.png"
+  },
+  {
+    "id": "TC-21",
+    "name": "Drawer Sidebar Mobile Navigation",
+    "role": "All Roles",
+    "expected": "Menu drawer sidebar mobile meluncur mulus dan mudah ditekan di layar sentuh",
+    "actual": "Drawer sidebar mobile terbuka responsif dengan backdrop overlay",
+    "status": "PASSED",
+    "screenshotFile": "21_mobile_sidebar_drawer.png"
+  },
+  {
+    "id": "TC-22",
+    "name": "Auto-Login Saat Tab Browser Ditutup/Dihapus",
+    "role": "Guru (Persisten)",
+    "expected": "Pengguna otomatis login kembali ke aplikasi tanpa memasukkan password ulang",
+    "actual": "Auto-login berhasil 100% menggunakan dual-storage persistent cookie & localStorage",
+    "status": "PASSED",
+    "screenshotFile": "22_autologin_verified.png"
+  }
+]
