@@ -14,6 +14,7 @@ const DashboardManager = {
 
     chartStatusInstance: null,
     chartPerbandinganInstance: null,
+    chartFolderFilter: "all",
 
     /**
      * Memuat data utama dashboard dari backend
@@ -142,39 +143,381 @@ const DashboardManager = {
             });
         }
 
-        // 2. Bar Chart Perbandingan Kepsek vs Guru
-        const canvasComp = document.getElementById('chartPerbandingan');
-        if (canvasComp) {
-            const countKepsek = this.getFilteredKepsek().length;
-            const countGuru = this.getFilteredGuru().length;
+        // 2. Isi Dropdown Folder dan Render Grafik Kepatuhan Unggah Tiap Sekolah
+        this.populateChartFolderDropdown();
+        this.renderSchoolComplianceChart();
+    },
 
-            const ctxComp = canvasComp.getContext('2d');
-            if (this.chartPerbandinganInstance) this.chartPerbandinganInstance.destroy();
+    /**
+     * Dapatkan daftar seluruh folder laporan aktif yang ada di sistem
+     */
+    getAllAvailableFolders() {
+        const folderSet = new Set();
 
-            this.chartPerbandinganInstance = new Chart(ctxComp, {
-                type: 'bar',
-                data: {
-                    labels: ['Kepala Sekolah', 'Guru'],
-                    datasets: [{
-                        label: 'Jumlah Laporan Terunggah',
-                        data: [countKepsek, countGuru],
-                        backgroundColor: ['#2563eb', '#6366f1'],
-                        borderRadius: 8
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: { stepSize: 1 }
-                        }
+        // 1. Ambil folder dari database Google Drive / LiveSync
+        const customFolders = (typeof LiveSync !== "undefined" && LiveSync.state.folders)
+            ? LiveSync.state.folders
+            : (typeof DriveManager !== "undefined" && DriveManager.cachedFolders ? DriveManager.cachedFolders : []);
+
+        customFolders.forEach(f => {
+            if (f && f.namaFolder && !f.namaFolder.startsWith("__DELETED__:") && !String(f.id).startsWith("DEL-")) {
+                folderSet.add(f.namaFolder.trim());
+            }
+        });
+
+        // 2. Ambil dari jenisPelaporan / kategori di laporan yang ada
+        const allReports = [...(this.cachedData.reportsKepsek || []), ...(this.cachedData.reportsGuru || [])];
+        allReports.forEach(r => {
+            if (r.jenisPelaporan && r.jenisPelaporan.trim()) {
+                folderSet.add(r.jenisPelaporan.trim());
+            }
+            if (r.kategori && r.kategori.trim()) {
+                if (r.kategori.length <= 35) folderSet.add(r.kategori.trim());
+            }
+        });
+
+        // 3. Pastikan folder umum utama ada di daftar jika belum ada folder lain
+        const defaults = ["Laporan Bulanan", "Laporan RKAS", "Supervisi KBM", "Laporan Mingguan", "Laporan Daring", "Modul Ajar / RPP"];
+        defaults.forEach(d => folderSet.add(d));
+
+        return Array.from(folderSet).sort((a, b) => a.localeCompare(b, 'id'));
+    },
+
+    /**
+     * Dapatkan daftar seluruh sekolah binaan
+     */
+    getAllSchoolsList() {
+        const schoolMap = new Map();
+
+        // Dari cachedData.schools atau LiveSync.state.schools
+        const metaSchools = (this.cachedData && this.cachedData.schools)
+            ? this.cachedData.schools
+            : ((typeof LiveSync !== "undefined" && LiveSync.state.schools) ? LiveSync.state.schools : []);
+
+        metaSchools.forEach(s => {
+            if (s && s.nama && s.nama.trim()) {
+                schoolMap.set(s.nama.trim().toLowerCase(), s.nama.trim());
+            }
+        });
+
+        // Dari seluruh laporan yang telah terkirim
+        const allReports = [...(this.cachedData.reportsKepsek || []), ...(this.cachedData.reportsGuru || [])];
+        allReports.forEach(r => {
+            if (r && r.asalSekolah && r.asalSekolah.trim()) {
+                schoolMap.set(r.asalSekolah.trim().toLowerCase(), r.asalSekolah.trim());
+            }
+        });
+
+        const list = Array.from(schoolMap.values());
+        return list.sort((a, b) => a.localeCompare(b, 'id'));
+    },
+
+    /**
+     * Isi pilihan dropdown folder pada header card grafik
+     */
+    populateChartFolderDropdown() {
+        const select = document.getElementById("select-filter-chart-folder");
+        if (!select) return;
+
+        const folders = this.getAllAvailableFolders();
+        const currentVal = this.chartFolderFilter || "all";
+
+        let html = `<option value="all" ${currentVal === "all" ? "selected" : ""}>📂 Semua Folder (Kelengkapan Total)</option>`;
+        if (folders.length > 0) {
+            html += `<optgroup label="Filter Per Folder Laporan">`;
+            folders.forEach(f => {
+                const isSel = currentVal.toLowerCase() === f.toLowerCase();
+                html += `<option value="${f}" ${isSel ? "selected" : ""}>📁 ${f}</option>`;
+            });
+            html += `</optgroup>`;
+        }
+
+        select.innerHTML = html;
+    },
+
+    /**
+     * Handler saat filter folder grafik diubah
+     */
+    onChartFolderFilterChange(val) {
+        this.chartFolderFilter = val;
+        this.renderSchoolComplianceChart();
+    },
+
+    /**
+     * Render Grafik Kepatuhan & Progres Unggah Per Sekolah (Menggantikan Bar Chart Kepsek vs Guru)
+     */
+    renderSchoolComplianceChart() {
+        const canvas = document.getElementById('chartPerbandingan');
+        if (!canvas) return;
+
+        const schools = this.getAllSchoolsList();
+        const folders = this.getAllAvailableFolders();
+        const allReports = [...(this.cachedData.reportsKepsek || []), ...(this.cachedData.reportsGuru || [])];
+
+        const subtitleEl = document.getElementById("chart-sekolah-subtitle");
+        const totalSchoolsEl = document.getElementById("chart-kpi-total-schools");
+        const kpiBadgeEl = document.getElementById("chart-kpi-badge");
+        const canvasWrapper = document.getElementById("chart-sekolah-canvas-wrapper");
+
+        if (totalSchoolsEl) totalSchoolsEl.innerText = schools.length;
+
+        // Jika belum ada sekolah sama sekali
+        if (schools.length === 0) {
+            if (subtitleEl) subtitleEl.innerText = "Belum ada sekolah binaan terdaftar di sistem";
+            if (kpiBadgeEl) {
+                kpiBadgeEl.className = "font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-lg border border-slate-200";
+                kpiBadgeEl.innerText = "0 Sekolah";
+            }
+            if (this.chartPerbandinganInstance) {
+                this.chartPerbandinganInstance.destroy();
+                this.chartPerbandinganInstance = null;
+            }
+            return;
+        }
+
+        // Sesuaikan tinggi canvas agar jika ada 20 sekolah, tidak berhimpitan
+        if (canvasWrapper) {
+            if (schools.length > 5) {
+                const dynamicHeight = Math.max(260, schools.length * 28 + 50);
+                canvasWrapper.style.height = `${dynamicHeight}px`;
+            } else {
+                canvasWrapper.style.height = "260px";
+            }
+        }
+
+        const isAllFilter = !this.chartFolderFilter || this.chartFolderFilter === "all";
+        const selectedFolder = this.chartFolderFilter;
+
+        let labels = [];
+        let datasetData = [];
+        let backgroundColors = [];
+        let borderColors = [];
+        let schoolDetails = [];
+
+        if (isAllFilter) {
+            // MODE A: SEMUA FOLDER (Kepatuhan Kelengkapan Folder Tiap Sekolah)
+            const totalTarget = Math.max(folders.length, 1);
+            let totalCompletedAllSchools = 0;
+
+            schools.forEach(schoolName => {
+                const sReports = allReports.filter(r => (r.asalSekolah || "").toLowerCase() === schoolName.toLowerCase());
+                
+                let completedCount = 0;
+                let missingFolders = [];
+                let uploadedFolders = [];
+
+                folders.forEach(f => {
+                    const fLower = f.toLowerCase();
+                    const hasF = sReports.some(r => {
+                        const j = (r.jenisPelaporan || "").toLowerCase();
+                        const k = (r.kategori || "").toLowerCase();
+                        return j === fLower || k === fLower || j.includes(fLower) || fLower.includes(j);
+                    });
+                    if (hasF) {
+                        completedCount++;
+                        uploadedFolders.push(f);
+                    } else {
+                        missingFolders.push(f);
                     }
+                });
+
+                const pct = Math.round((completedCount / totalTarget) * 100);
+                totalCompletedAllSchools += pct;
+
+                labels.push(schoolName);
+                datasetData.push(completedCount);
+                schoolDetails.push({
+                    school: schoolName,
+                    completed: completedCount,
+                    totalTarget: totalTarget,
+                    percent: pct,
+                    missing: missingFolders,
+                    uploaded: uploadedFolders
+                });
+
+                // Warna progress: hijau (100%), biru (>=60%), amber (>=30%), merah (<30%)
+                if (pct === 100) {
+                    backgroundColors.push('rgba(16, 185, 129, 0.85)');
+                    borderColors.push('#10b981');
+                } else if (pct >= 60) {
+                    backgroundColors.push('rgba(59, 130, 246, 0.85)');
+                    borderColors.push('#3b82f6');
+                } else if (pct >= 30) {
+                    backgroundColors.push('rgba(245, 158, 11, 0.85)');
+                    borderColors.push('#f59e0b');
+                } else {
+                    backgroundColors.push('rgba(239, 68, 68, 0.85)');
+                    borderColors.push('#ef4444');
                 }
             });
+
+            const avgPct = Math.round(totalCompletedAllSchools / schools.length);
+            if (subtitleEl) {
+                subtitleEl.innerText = `Menampilkan kelengkapan upload dari total ${folders.length} folder laporan aktif`;
+            }
+            if (kpiBadgeEl) {
+                kpiBadgeEl.className = avgPct >= 75
+                    ? "font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200"
+                    : (avgPct >= 50
+                        ? "font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-lg border border-blue-200"
+                        : "font-bold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-lg border border-amber-200");
+                kpiBadgeEl.innerText = `Rata-rata: ${avgPct}% Lengkap (${folders.length} Folder)`;
+            }
+
+        } else {
+            // MODE B: FILTER FOLDER KHUSUS (Misal: "Laporan RKAS")
+            const fLower = selectedFolder.toLowerCase();
+            let schoolsUploadedCount = 0;
+
+            schools.forEach(schoolName => {
+                const matching = allReports.filter(r => {
+                    if ((r.asalSekolah || "").toLowerCase() !== schoolName.toLowerCase()) return false;
+                    const j = (r.jenisPelaporan || "").toLowerCase();
+                    const k = (r.kategori || "").toLowerCase();
+                    return j === fLower || k === fLower || j.includes(fLower) || fLower.includes(j);
+                });
+
+                const count = matching.length;
+                if (count > 0) schoolsUploadedCount++;
+
+                labels.push(schoolName);
+                datasetData.push(count);
+                schoolDetails.push({
+                    school: schoolName,
+                    count: count,
+                    isUploaded: count > 0,
+                    folder: selectedFolder
+                });
+
+                if (count > 0) {
+                    backgroundColors.push('rgba(16, 185, 129, 0.85)');
+                    borderColors.push('#10b981');
+                } else {
+                    backgroundColors.push('rgba(254, 202, 202, 0.55)');
+                    borderColors.push('#ef4444');
+                }
+            });
+
+            const compliancePct = Math.round((schoolsUploadedCount / schools.length) * 100);
+            if (subtitleEl) {
+                subtitleEl.innerText = `Status pengunggahan berkas "${selectedFolder}" pada seluruh sekolah binaan`;
+            }
+            if (kpiBadgeEl) {
+                kpiBadgeEl.className = compliancePct >= 80
+                    ? "font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200"
+                    : (compliancePct >= 50
+                        ? "font-bold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-lg border border-amber-200"
+                        : "font-bold text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-lg border border-rose-200");
+                kpiBadgeEl.innerText = `${schoolsUploadedCount} / ${schools.length} Sekolah Sudah Upload (${compliancePct}%)`;
+            }
         }
+
+        const ctx = canvas.getContext('2d');
+        if (this.chartPerbandinganInstance) {
+            this.chartPerbandinganInstance.destroy();
+        }
+
+        // Gunakan horizontal bar (indexAxis: 'y') jika sekolah >= 3 agar nama sekolah mudah dibaca
+        const isHorizontal = schools.length >= 3;
+
+        this.chartPerbandinganInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: isAllFilter ? 'Folder Terunggah' : `Berkas ${selectedFolder}`,
+                    data: datasetData,
+                    backgroundColor: backgroundColors,
+                    borderColor: borderColors,
+                    borderWidth: 1.5,
+                    borderRadius: 6,
+                    maxBarThickness: 24
+                }]
+            },
+            options: {
+                indexAxis: isHorizontal ? 'y' : 'x',
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: {
+                    padding: {
+                        left: 10,
+                        right: 15,
+                        top: 5,
+                        bottom: 5
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.92)',
+                        padding: 10,
+                        titleFont: { family: 'Poppins', size: 12, weight: 'bold' },
+                        bodyFont: { family: 'Poppins', size: 11 },
+                        callbacks: {
+                            title: (items) => items[0].label,
+                            label: (item) => {
+                                const s = schoolDetails[item.dataIndex];
+                                if (isAllFilter) {
+                                    return ` Kelengkapan: ${item.raw} dari ${s.totalTarget} folder (${s.percent}%)`;
+                                } else {
+                                    return s.isUploaded 
+                                        ? ` ✅ Sudah Upload: ${item.raw} berkas (${selectedFolder})`
+                                        : ` ❌ Belum Mengunggah (${selectedFolder})`;
+                                }
+                            },
+                            afterLabel: (item) => {
+                                const s = schoolDetails[item.dataIndex];
+                                if (isAllFilter && s.missing && s.missing.length > 0) {
+                                    const missingSample = s.missing.slice(0, 2).join(", ");
+                                    const more = s.missing.length > 2 ? ` (+${s.missing.length - 2} lagi)` : "";
+                                    return ` Belum: ${missingSample}${more}`;
+                                }
+                                return null;
+                            }
+                        }
+                    }
+                },
+                scales: isHorizontal ? {
+                    x: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1,
+                            precision: 0,
+                            font: { family: 'Poppins', size: 10 }
+                        },
+                        grid: { color: '#F0EBE1' }
+                    },
+                    y: {
+                        afterFit: (axis) => {
+                            axis.width = Math.max(axis.width, 135);
+                        },
+                        ticks: {
+                            font: { family: 'Poppins', size: window.innerWidth < 640 ? 9 : 11, weight: '500' },
+                            color: '#334155',
+                            padding: 6
+                        },
+                        grid: { display: false }
+                    }
+                } : {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1,
+                            precision: 0,
+                            font: { family: 'Poppins', size: 10 }
+                        },
+                        grid: { color: '#F0EBE1' }
+                    },
+                    x: {
+                        ticks: {
+                            font: { family: 'Poppins', size: 10, weight: '500' },
+                            color: '#334155'
+                        },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
     },
 
     /**
