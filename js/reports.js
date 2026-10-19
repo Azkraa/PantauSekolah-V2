@@ -1660,63 +1660,291 @@ const ReportManager = {
     },
 
     /**
-     * Modal Verifikasi Laporan
+     * Helper: Mendapatkan URL Embed Pratinjau Google Drive / Docs / Images
+     */
+    getEmbedPreviewUrl(url) {
+        if (!url || typeof url !== "string") return "";
+        const clean = url.trim();
+
+        // Sudah merupakan format preview embed
+        if (clean.includes("drive.google.com") && clean.includes("/preview")) {
+            return clean;
+        }
+
+        // Format Google Drive /file/d/{id}/...
+        const matchD = clean.match(/\/file\/d\/([a-zA-Z0-9_-]+)/i);
+        if (matchD && matchD[1]) {
+            return `https://drive.google.com/file/d/${matchD[1]}/preview`;
+        }
+
+        // Format query parameter id={id}
+        const matchId = clean.match(/[?&]id=([a-zA-Z0-9_-]+)/i);
+        if (matchId && matchId[1]) {
+            return `https://drive.google.com/file/d/${matchId[1]}/preview`;
+        }
+
+        // Dokumen Google Docs / Sheets
+        if (clean.includes("docs.google.com/document/d/")) {
+            return clean.replace(/\/edit.*$/, "/preview");
+        }
+        if (clean.includes("docs.google.com/spreadsheets/d/")) {
+            return clean.replace(/\/edit.*$/, "/preview");
+        }
+
+        return clean;
+    },
+
+    /**
+     * Helper: Mendapatkan metadata badge tipe file & ikon
+     */
+    getFileBadgeMeta(filename = "", fileUrl = "", kategori = "") {
+        const text = ((filename || "") + " " + (fileUrl || "") + " " + (kategori || "")).toLowerCase();
+        if (text.includes(".pdf")) {
+            return { label: "PDF", bg: "bg-rose-100 text-rose-700 border-rose-200", icon: "fa-file-pdf", isImage: false };
+        }
+        if (text.includes(".docx") || text.includes(".doc") || text.includes("word") || text.includes("docs")) {
+            return { label: "DOCX", bg: "bg-blue-100 text-blue-700 border-blue-200", icon: "fa-file-word", isImage: false };
+        }
+        if (text.includes(".xlsx") || text.includes(".xls") || text.includes(".csv") || text.includes("excel") || text.includes("spreadsheet")) {
+            return { label: "EXCEL", bg: "bg-emerald-100 text-emerald-700 border-emerald-200", icon: "fa-file-excel", isImage: false };
+        }
+        if (text.includes(".jpg") || text.includes(".jpeg") || text.includes(".png") || text.includes(".webp") || text.includes(".gif") || text.includes("gambar") || text.includes("foto")) {
+            return { label: "GAMBAR", bg: "bg-amber-100 text-amber-700 border-amber-200", icon: "fa-file-image", isImage: true };
+        }
+        return { label: "BERKAS", bg: "bg-slate-100 text-slate-700 border-slate-200", icon: "fa-file-lines", isImage: false };
+    },
+
+    /**
+     * Sisipkan template catatan saran verifikasi cepat
+     */
+    insertVerifTemplate(templateText) {
+        const catatanEl = document.getElementById("modal-catatan");
+        if (!catatanEl) return;
+        const currentVal = catatanEl.value.trim();
+        if (!currentVal) {
+            catatanEl.value = templateText;
+        } else {
+            catatanEl.value = currentVal + "\n" + templateText;
+        }
+        catatanEl.focus();
+    },
+
+    /**
+     * Refresh ulang iframe pratinjau dokumen
+     */
+    reloadPreviewIframe() {
+        const iframe = document.getElementById("modal-preview-iframe");
+        const loading = document.getElementById("modal-preview-loading");
+        if (!iframe) return;
+        const curSrc = iframe.src;
+        if (curSrc && curSrc !== "about:blank") {
+            if (loading) loading.classList.remove("hidden");
+            iframe.src = "about:blank";
+            setTimeout(() => {
+                iframe.src = curSrc;
+            }, 120);
+        }
+    },
+
+    /**
+     * Modal Verifikasi Laporan dengan Pratinjau Dokumen Live & Intisari Poin Penting
      */
     openModalVerifikasi(id, nama, status, catatan, targetSheet) {
         this.activeSelectedId = id;
         this.activeTargetSheet = targetSheet;
 
-        document.getElementById("modal-id-laporan").innerText = "ID: " + id;
-        document.getElementById("modal-user-name").innerText = "Pengirim: " + nama;
-        document.getElementById("modal-status").value = (status !== "Menunggu Verifikasi" && status !== "Menunggu Pengawas" && status !== "Menunggu Kepsek") ? status : "Disetujui";
-        
-        const catatanInput = document.getElementById("modal-catatan");
-        catatanInput.value = (catatan !== "Belum ada catatan" && catatan !== "-") ? catatan : "";
+        // Cari item laporan di seluruh sumber data cache
+        let reportItem = null;
+        const findInList = (list) => Array.isArray(list) ? list.find(x => x && x.id === id) : null;
 
-        // Tampilkan sorotan poin penting dokumen dan link berkas
-        const rawReports = (targetSheet === "Laporan_Kepsek")
-            ? ((typeof DashboardManager !== "undefined" && DashboardManager.cachedData.reportsKepsek) ? DashboardManager.cachedData.reportsKepsek : [])
-            : ((typeof DashboardManager !== "undefined" && DashboardManager.cachedData.reportsGuru) ? DashboardManager.cachedData.reportsGuru : []);
-
-        const reportItem = rawReports.find(x => x.id === id);
-
-        const poinBox = document.getElementById("modal-poin-penting-box");
-        const poinText = document.getElementById("modal-poin-penting-text");
-        const fileLink = document.getElementById("modal-file-link");
-        const fileNameText = document.getElementById("modal-file-name-text");
-
-        if (poinBox && poinText) {
-            const poin = reportItem ? this.getPoinPenting(reportItem) : "-";
-            poinText.innerText = poin || "Tidak ada ringkasan poin penting khusus.";
-            if (fileLink && reportItem && reportItem.fileUrl) {
-                fileLink.href = reportItem.fileUrl;
-                fileLink.classList.remove("hidden");
-            } else if (fileLink) {
-                fileLink.classList.add("hidden");
+        if (typeof DashboardManager !== "undefined" && DashboardManager.cachedData) {
+            if (targetSheet === "Laporan_Kepsek") {
+                reportItem = findInList(DashboardManager.cachedData.reportsKepsek);
+            } else if (targetSheet === "Laporan_Guru") {
+                reportItem = findInList(DashboardManager.cachedData.reportsGuru);
             }
-            if (fileNameText && reportItem) {
-                const fname = reportItem.namaFile || reportItem.filename || reportItem.kategori || "Berkas Laporan";
-                fileNameText.innerHTML = `<i class="fa-solid fa-paperclip text-slate-400 mr-1"></i>Nama Berkas: <strong class="text-slate-600">${fname}</strong>`;
+            if (!reportItem) {
+                reportItem = findInList(DashboardManager.cachedData.reportsKepsek) || findInList(DashboardManager.cachedData.reportsGuru);
             }
         }
 
+        if (!reportItem && typeof LiveSync !== "undefined" && LiveSync.state) {
+            if (targetSheet === "Laporan_Kepsek") {
+                reportItem = findInList(LiveSync.state.reportsKepsek);
+            } else if (targetSheet === "Laporan_Guru") {
+                reportItem = findInList(LiveSync.state.reportsGuru);
+            }
+            if (!reportItem) {
+                reportItem = findInList(LiveSync.state.reportsKepsek) || findInList(LiveSync.state.reportsGuru);
+            }
+        }
+
+        // Tampilkan Identitas Dokumen
+        const idEl = document.getElementById("modal-id-laporan");
+        const userEl = document.getElementById("modal-user-name");
+        if (idEl) idEl.innerText = "ID: " + id;
+        if (userEl) userEl.innerText = nama || (reportItem ? reportItem.nama : "Pengirim Laporan");
+
+        const schoolEl = document.getElementById("modal-school-text");
+        if (schoolEl) {
+            schoolEl.innerText = (reportItem && reportItem.asalSekolah) ? reportItem.asalSekolah : (this.selectedSchoolState || "-");
+        }
+
+        const dateEl = document.getElementById("modal-date-text");
+        if (dateEl) {
+            let tglFormatted = "-";
+            if (reportItem && reportItem.tanggal) {
+                try {
+                    tglFormatted = new Date(reportItem.tanggal).toLocaleDateString("id-ID", {
+                        day: "numeric", month: "short", year: "numeric"
+                    });
+                } catch(e) {
+                    tglFormatted = String(reportItem.tanggal).split("T")[0];
+                }
+            }
+            dateEl.innerText = tglFormatted;
+        }
+
+        const katBadge = document.getElementById("modal-meta-kategori");
+        if (katBadge) {
+            katBadge.innerText = (reportItem && (reportItem.kategori || reportItem.jenisPelaporan))
+                ? (reportItem.kategori || reportItem.jenisPelaporan)
+                : "Laporan";
+        }
+
+        // Tampilkan Status & Catatan
+        const statusSelect = document.getElementById("modal-status");
+        if (statusSelect) {
+            statusSelect.value = (status !== "Menunggu Verifikasi" && status !== "Menunggu Pengawas" && status !== "Menunggu Kepsek") 
+                ? status 
+                : "Disetujui";
+        }
+
+        const catatanInput = document.getElementById("modal-catatan");
+        if (catatanInput) {
+            catatanInput.value = (catatan !== "Belum ada catatan" && catatan !== "-") ? catatan : "";
+        }
+
+        // Tampilkan Sorotan Poin-Poin Penting Laporan
+        const poinBox = document.getElementById("modal-poin-penting-box");
+        const poinText = document.getElementById("modal-poin-penting-text");
+        if (poinBox && poinText) {
+            const poin = reportItem ? this.getPoinPenting(reportItem) : "";
+            poinText.innerText = poin || "• Dokumen administrasi terverifikasi\n• Silakan periksa pratinjau berkas secara lengkap di sebelah kiri";
+        }
+
+        // TAMPILAN PREVIEW BERKAS DOKUMEN TERPADU
+        const fileUrl = reportItem ? (reportItem.fileUrl || "") : "";
+        const rawFilename = reportItem ? (reportItem.namaFile || reportItem.filename || reportItem.kategori || "Berkas Laporan") : "Berkas Laporan";
+        const badgeMeta = this.getFileBadgeMeta(rawFilename, fileUrl, reportItem ? reportItem.kategori : "");
+
+        const previewBadge = document.getElementById("modal-preview-badge");
+        if (previewBadge) {
+            previewBadge.className = `px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider border ${badgeMeta.bg}`;
+            previewBadge.innerText = badgeMeta.label;
+        }
+
+        const previewFilename = document.getElementById("modal-preview-filename");
+        if (previewFilename) {
+            previewFilename.innerText = rawFilename;
+            previewFilename.title = rawFilename;
+        }
+
+        const extLink = document.getElementById("modal-file-link-ext");
+        const fileLink = document.getElementById("modal-file-link");
+        if (fileUrl) {
+            if (extLink) {
+                extLink.href = fileUrl;
+                extLink.classList.remove("hidden");
+            }
+            if (fileLink) {
+                fileLink.href = fileUrl;
+                fileLink.classList.remove("hidden");
+            }
+        } else {
+            if (extLink) extLink.classList.add("hidden");
+            if (fileLink) fileLink.classList.add("hidden");
+        }
+
+        const fallbackDriveBtn = document.getElementById("modal-fallback-drive-btn");
+        if (fallbackDriveBtn && fileUrl) {
+            fallbackDriveBtn.href = fileUrl;
+        }
+
+        // Konfigurasi Frame & Pratinjau Dokumen
+        const iframe = document.getElementById("modal-preview-iframe");
+        const imgContainer = document.getElementById("modal-preview-image-container");
+        const imgEl = document.getElementById("modal-preview-image");
+        const loading = document.getElementById("modal-preview-loading");
+        const fallback = document.getElementById("modal-preview-fallback");
+
+        if (fallback) fallback.classList.add("hidden");
+
+        const embedUrl = this.getEmbedPreviewUrl(fileUrl);
+
+        if (badgeMeta.isImage && fileUrl && (fileUrl.startsWith("data:image") || fileUrl.includes("drive.google.com/thumbnail") || /\.(png|jpe?g|webp|gif)($|\?)/i.test(fileUrl))) {
+            // Mode Gambar Langsung
+            if (loading) loading.classList.add("hidden");
+            if (iframe) {
+                iframe.classList.add("hidden");
+                iframe.src = "about:blank";
+            }
+            if (imgContainer && imgEl) {
+                imgEl.src = fileUrl;
+                imgContainer.classList.remove("hidden");
+            }
+        } else if (embedUrl) {
+            // Mode Iframe Google Drive Preview
+            if (imgContainer) imgContainer.classList.add("hidden");
+            if (iframe) {
+                iframe.classList.remove("hidden");
+                if (loading) loading.classList.remove("hidden");
+
+                let loaded = false;
+                iframe.onload = () => {
+                    loaded = true;
+                    if (loading) loading.classList.add("hidden");
+                };
+
+                if (this._previewTimer) clearTimeout(this._previewTimer);
+                this._previewTimer = setTimeout(() => {
+                    if (!loaded && loading) {
+                        loading.classList.add("hidden");
+                    }
+                }, 8000);
+
+                iframe.src = embedUrl;
+            }
+        } else {
+            // Berkas Tidak Memiliki URL yang Valid
+            if (loading) loading.classList.add("hidden");
+            if (iframe) {
+                iframe.classList.add("hidden");
+                iframe.src = "about:blank";
+            }
+            if (imgContainer) imgContainer.classList.add("hidden");
+            if (fallback) fallback.classList.remove("hidden");
+        }
+
+        // Tampilkan Modal
         document.getElementById("modal-verifikasi").classList.remove("hidden");
 
-        // Auto-focus pada dropdown status verifikasi
+        // Auto-focus pada pilihan status
         setTimeout(() => {
-            const statusSelect = document.getElementById("modal-status");
             if (statusSelect) statusSelect.focus();
         }, 50);
 
-        // Enter di catatan langsung menyimpan verifikasi (Shift+Enter untuk baris baru)
-        catatanInput.onkeydown = (e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                this.simpanVerifikasi();
-            }
-        };
+        // Shortcut keyboard enter untuk simpan
+        if (catatanInput) {
+            catatanInput.onkeydown = (e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    this.simpanVerifikasi();
+                }
+            };
+        }
 
-        // Escape key handler
+        // Handler Escape untuk menutup modal
         if (this._escHandler) window.removeEventListener("keydown", this._escHandler);
         this._escHandler = (e) => {
             if (e.key === "Escape") {
@@ -1730,6 +1958,18 @@ const ReportManager = {
         if (this._escHandler) {
             window.removeEventListener("keydown", this._escHandler);
             this._escHandler = null;
+        }
+        if (this._previewTimer) {
+            clearTimeout(this._previewTimer);
+            this._previewTimer = null;
+        }
+        const iframe = document.getElementById("modal-preview-iframe");
+        if (iframe) {
+            iframe.src = "about:blank";
+        }
+        const imgEl = document.getElementById("modal-preview-image");
+        if (imgEl) {
+            imgEl.src = "";
         }
         document.getElementById("modal-verifikasi").classList.add("hidden");
         this.activeSelectedId = "";

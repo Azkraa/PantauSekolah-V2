@@ -89,62 +89,195 @@
     </div>
 
     <!-- ==================================================================== -->
-    <!-- MODAL 1: VERIFIKASI LAPORAN                                           -->
+    <!-- MODAL 1: VERIFIKASI LAPORAN DENGAN PREVIEW DOKUMEN                    -->
     <!-- ==================================================================== -->
     <div id="modal-verifikasi"
-        class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center hidden p-4 backdrop-blur-sm">
-        <div class="bg-white rounded-3xl p-5 sm:p-6 w-full max-w-md shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto border border-[#E8E2D5]">
-            <div class="flex justify-between items-center border-b border-[#F0EBE1] pb-3">
-                <h3 class="font-bold text-slate-800 text-base sm:text-lg flex items-center gap-2">
-                    <i class="fa-solid fa-file-circle-check text-blue-600"></i> Verifikasi Laporan
-                </h3>
-                <button onclick="ReportManager.closeModalVerifikasi()" class="text-slate-400 hover:text-slate-600 p-1">
-                    <i class="fa-solid fa-xmark text-lg"></i>
+        class="fixed inset-0 bg-slate-900/70 z-50 flex items-center justify-center hidden p-2 sm:p-4 backdrop-blur-sm transition-all duration-200">
+        <div class="bg-white rounded-3xl w-full max-w-5xl shadow-2xl max-h-[94vh] flex flex-col border border-[#E8E2D5] overflow-hidden">
+            <!-- Modal Header -->
+            <div class="flex justify-between items-center border-b border-[#F0EBE1] px-5 sm:px-6 py-3.5 bg-[#FAF8F5] flex-shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-lg font-bold border border-blue-100 shadow-2xs">
+                        <i class="fa-solid fa-file-circle-check"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-extrabold text-slate-800 text-sm sm:text-base leading-tight">
+                                Verifikasi & Evaluasi Dokumen
+                            </h3>
+                            <span id="modal-preview-header-badge" class="hidden sm:inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100/70 text-blue-800 border border-blue-200/60">
+                                Live Preview
+                            </span>
+                        </div>
+                        <p class="text-[11px] text-slate-400">Periksa isi berkas secara langsung dan tentukan status validasi</p>
+                    </div>
+                </div>
+                <button type="button" onclick="ReportManager.closeModalVerifikasi()" title="Tutup Modal (Esc)"
+                    class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 flex items-center justify-center transition-colors">
+                    <i class="fa-solid fa-xmark text-sm"></i>
                 </button>
             </div>
-            <form id="form-verifikasi" onsubmit="event.preventDefault(); ReportManager.simpanVerifikasi();">
-                <div>
-                    <p id="modal-id-laporan" class="text-xs font-semibold text-blue-600 mb-0.5 font-mono"></p>
-                    <p id="modal-user-name" class="text-xs sm:text-sm font-bold text-slate-800 mb-2"></p>
 
-                    <!-- Preview Poin-Poin Penting Berkas yang Diunggah -->
-                    <div id="modal-poin-penting-box" class="p-3 bg-amber-50/70 border border-amber-200 rounded-xl mb-3 text-xs">
-                        <div class="flex items-center justify-between gap-1 mb-1">
-                            <span class="font-bold text-amber-900 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
-                                <i class="fa-solid fa-list-check text-amber-600"></i> Poin-Poin Penting Berkas:
+            <!-- Modal Content: Split Screen (Kiri: Preview Dokumen, Kanan: Form Evaluasi) -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 flex-1 overflow-hidden min-h-0">
+                <!-- PANEL KIRI: PREVIEW TAMPILAN BERKAS DOKUMEN -->
+                <div class="lg:col-span-7 bg-[#F6F3EC]/40 border-b lg:border-b-0 lg:border-r border-[#E8E2D5] flex flex-col min-h-[300px] sm:min-h-[400px] lg:min-h-0">
+                    <!-- Preview Action Toolbar -->
+                    <div class="flex items-center justify-between px-4 py-2.5 bg-white border-b border-[#E8E2D5] text-xs gap-2 flex-shrink-0">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span id="modal-preview-badge" class="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-rose-100 text-rose-700 border border-rose-200">
+                                PDF
                             </span>
-                            <a id="modal-file-link" href="#" target="_blank" class="text-blue-600 hover:text-blue-800 font-bold hover:underline text-[11px] flex items-center gap-1">
+                            <span id="modal-preview-filename" class="font-bold text-slate-700 truncate text-xs" title="Nama Dokumen">
+                                Memuat berkas...
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-1.5 flex-shrink-0">
+                            <button type="button" onclick="ReportManager.reloadPreviewIframe()" title="Muat Ulang Tampilan"
+                                class="px-2.5 py-1 text-slate-600 hover:text-blue-600 bg-slate-100 hover:bg-blue-50 rounded-lg text-[11px] font-semibold transition-colors flex items-center gap-1">
+                                <i class="fa-solid fa-arrows-rotate text-[10px]"></i> <span class="hidden sm:inline">Refresh</span>
+                            </button>
+                            <a id="modal-file-link-ext" href="#" target="_blank" rel="noopener noreferrer" title="Buka Dokumen di Tab Baru"
+                                class="px-2.5 py-1 text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 rounded-lg text-[11px] font-bold transition-colors flex items-center gap-1 border border-blue-200/50">
+                                <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> <span>Buka di Tab Baru</span>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Area Frame Pratinjau Terpadu -->
+                    <div class="relative flex-1 bg-slate-100/70 overflow-hidden flex items-center justify-center min-h-[260px] sm:min-h-[340px] lg:min-h-0">
+                        <!-- Loading Skeleton / Spinner -->
+                        <div id="modal-preview-loading" class="absolute inset-0 bg-[#FAF8F5]/90 flex flex-col items-center justify-center gap-2.5 z-10 p-4 text-center">
+                            <div class="w-9 h-9 border-3 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
+                            <p class="text-xs font-bold text-slate-700">Memuat Tampilan Pratinjau...</p>
+                            <p class="text-[10px] text-slate-400">Mengambil dokumen langsung dari Google Drive</p>
+                        </div>
+
+                        <!-- Direct Image Preview (Jika tipe file adalah gambar) -->
+                        <div id="modal-preview-image-container" class="hidden absolute inset-0 overflow-auto p-4 flex items-center justify-center bg-slate-900/5 z-5">
+                            <img id="modal-preview-image" src="" alt="Pratinjau Gambar" class="max-w-full max-h-full object-contain rounded-lg shadow-sm border border-[#E8E2D5]">
+                        </div>
+
+                        <!-- Interactive Iframe Preview (Untuk PDF, Docs, Excel, PPTX, dll via Google Drive Preview) -->
+                        <iframe id="modal-preview-iframe" src="about:blank" class="w-full h-full border-0" allow="autoplay" loading="lazy"></iframe>
+
+                        <!-- Fallback jika berkas tidak bisa dipratinjau di iframe -->
+                        <div id="modal-preview-fallback" class="hidden absolute inset-0 bg-white flex flex-col items-center justify-center p-6 text-center z-20 space-y-3">
+                            <div class="w-14 h-14 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center text-2xl border border-amber-200 shadow-2xs">
+                                <i class="fa-solid fa-file-shield"></i>
+                            </div>
+                            <div class="space-y-1 max-w-sm">
+                                <p class="text-sm font-bold text-slate-800">Pratinjau Dalam Frame Terkendala</p>
+                                <p class="text-xs text-slate-500 leading-relaxed">
+                                    Berkas tetap dapat dibuka dan diperiksa secara langsung di Google Drive resmi melalui tombol di bawah.
+                                </p>
+                            </div>
+                            <a id="modal-fallback-drive-btn" href="#" target="_blank" rel="noopener noreferrer"
+                                class="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all">
+                                <i class="fa-brands fa-google-drive"></i> Buka Berkas di Google Drive
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PANEL KANAN: DETAIL & FORM KEPUTUSAN VERIFIKASI -->
+                <div class="lg:col-span-5 flex flex-col overflow-y-auto p-4 sm:p-5 bg-white space-y-3.5">
+                    <!-- Ringkasan Identitas Dokumen -->
+                    <div class="p-3.5 bg-[#FAF8F5] rounded-2xl border border-[#E8E2D5] space-y-1.5">
+                        <div class="flex items-center justify-between gap-1 flex-wrap">
+                            <span id="modal-id-laporan" class="text-xs font-black text-blue-600 font-mono tracking-tight"></span>
+                            <span id="modal-meta-kategori" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700"></span>
+                        </div>
+                        <div class="flex items-center gap-2 pt-0.5">
+                            <div class="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                                <i class="fa-solid fa-user"></i>
+                            </div>
+                            <p id="modal-user-name" class="text-xs sm:text-sm font-bold text-slate-800 truncate"></p>
+                        </div>
+                        <div class="flex items-center justify-between text-[10px] text-slate-500 pt-1.5 border-t border-[#F0EBE1] flex-wrap gap-1">
+                            <span id="modal-meta-sekolah" class="truncate flex items-center gap-1">
+                                <i class="fa-solid fa-school text-slate-400"></i> <span id="modal-school-text">-</span>
+                            </span>
+                            <span id="modal-meta-tanggal" class="flex-shrink-0 flex items-center gap-1">
+                                <i class="fa-regular fa-calendar text-slate-400"></i> <span id="modal-date-text">-</span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Sorotan Poin-Poin Penting Laporan -->
+                    <div id="modal-poin-penting-box" class="p-3.5 bg-amber-50/70 border border-amber-200/90 rounded-2xl text-xs space-y-1.5">
+                        <div class="flex items-center justify-between gap-1">
+                            <span class="font-bold text-amber-900 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                                <i class="fa-solid fa-list-check text-amber-600"></i> Poin-Poin Penting Dokumen:
+                            </span>
+                            <a id="modal-file-link" href="#" target="_blank" class="hidden text-blue-600 hover:text-blue-800 font-bold hover:underline text-[11px] items-center gap-1">
                                 <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> Buka File
                             </a>
                         </div>
-                        <p id="modal-poin-penting-text" class="text-slate-700 leading-relaxed font-medium whitespace-pre-line"></p>
-                        <p id="modal-file-name-text" class="text-[10px] text-slate-400 mt-1.5 truncate"></p>
+                        <div id="modal-poin-penting-text" class="text-slate-700 leading-relaxed font-medium whitespace-pre-line text-[11px] sm:text-xs"></div>
+                        <p id="modal-file-name-text" class="text-[10px] text-slate-400 mt-1 truncate hidden"></p>
                     </div>
 
-                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Status Verifikasi</label>
-                    <select id="modal-status"
-                        class="w-full border border-[#DCD5C7] p-2.5 rounded-xl mb-3 text-xs sm:text-sm font-medium focus:ring-2 focus:ring-blue-500 bg-white">
-                        <option value="Disetujui">✅ Disetujui</option>
-                        <option value="Perlu Perbaikan">⚠️ Perlu Perbaikan</option>
-                        <option value="Ditolak">❌ Ditolak</option>
-                    </select>
+                    <!-- Form Verifikasi -->
+                    <form id="form-verifikasi" onsubmit="event.preventDefault(); ReportManager.simpanVerifikasi();" class="space-y-3 pt-0.5">
+                        <!-- Pilihan Status Verifikasi -->
+                        <div>
+                            <label class="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1 flex items-center justify-between">
+                                <span>Status Verifikasi</span>
+                                <span class="text-[10px] font-normal text-slate-400">Pilih hasil validasi</span>
+                            </label>
+                            <select id="modal-status"
+                                class="w-full border border-[#DCD5C7] p-2.5 rounded-xl text-xs sm:text-sm font-bold text-slate-800 focus:ring-2 focus:ring-blue-500 bg-white shadow-2xs">
+                                <option value="Disetujui">✅ Disetujui</option>
+                                <option value="Perlu Perbaikan">⚠️ Perlu Perbaikan</option>
+                                <option value="Ditolak">❌ Ditolak</option>
+                            </select>
+                        </div>
 
-                    <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Catatan Evaluasi / Saran</label>
-                    <textarea id="modal-catatan" rows="3"
-                        class="w-full border border-[#DCD5C7] p-2.5 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-blue-500"
-                        placeholder="Masukkan saran pembinaan atau alasan perbaikan... (Tekan Enter untuk simpan, Shift+Enter untuk baris baru)"></textarea>
+                        <!-- Catatan Evaluasi & Saran dengan Saran Cepat -->
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                                    Catatan Evaluasi / Saran
+                                </label>
+                                <span class="text-[10px] text-slate-400">Klik template cepat:</span>
+                            </div>
+
+                            <!-- Template Cepat Saran -->
+                            <div class="flex items-center gap-1.5 flex-wrap mb-1.5">
+                                <button type="button" onclick="ReportManager.insertVerifTemplate('Dokumen lengkap, valid, dan telah sesuai juknis.')"
+                                    class="text-[10px] bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-lg font-medium transition-colors cursor-pointer">
+                                    + Sesuai Juknis
+                                </button>
+                                <button type="button" onclick="ReportManager.insertVerifTemplate('Mohon lengkapi tanda tangan dan tanggal pengesahan.')"
+                                    class="text-[10px] bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-lg font-medium transition-colors cursor-pointer">
+                                    + Tanda Tangan
+                                </button>
+                                <button type="button" onclick="ReportManager.insertVerifTemplate('Lampiran belum lengkap, harap unggah berkas perbaikan.')"
+                                    class="text-[10px] bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-lg font-medium transition-colors cursor-pointer">
+                                    + Lampiran Kurang
+                                </button>
+                            </div>
+
+                            <textarea id="modal-catatan" rows="3"
+                                class="w-full border border-[#DCD5C7] p-2.5 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 leading-relaxed shadow-2xs"
+                                placeholder="Tuliskan catatan pembinaan atau petunjuk perbaikan... (Tekan Enter untuk simpan, Shift+Enter untuk baris baru)"></textarea>
+                        </div>
+
+                        <!-- Tombol Aksi Bawah -->
+                        <div class="flex items-center justify-end gap-2 pt-2 border-t border-[#F0EBE1]">
+                            <button type="button" onclick="ReportManager.closeModalVerifikasi()"
+                                class="px-4 py-2 bg-[#F0EBE1] hover:bg-[#E5DFD3] text-slate-700 rounded-xl text-xs font-bold border border-[#E0D7C5] transition-colors">
+                                Batal
+                            </button>
+                            <button type="submit" id="btn-simpan-verifikasi"
+                                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-600/20 transition-all flex items-center gap-1.5 cursor-pointer">
+                                <i class="fa-solid fa-circle-check text-xs"></i> Simpan Verifikasi
+                            </button>
+                        </div>
+                    </form>
                 </div>
-                <div class="flex justify-end gap-2 pt-3 border-t border-[#F0EBE1] mt-4">
-                    <button type="button" onclick="ReportManager.closeModalVerifikasi()"
-                        class="px-4 py-2 bg-[#F0EBE1] text-slate-700 rounded-xl text-xs font-semibold hover:bg-[#E5DFD3]">
-                        Batal
-                    </button>
-                    <button type="submit" id="btn-simpan-verifikasi"
-                        class="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 shadow-md">
-                        Simpan Verifikasi
-                    </button>
-                </div>
-            </form>
+            </div>
         </div>
     </div>
 
