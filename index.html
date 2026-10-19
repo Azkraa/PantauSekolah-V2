@@ -105,7 +105,21 @@
             <form id="form-verifikasi" onsubmit="event.preventDefault(); ReportManager.simpanVerifikasi();">
                 <div>
                     <p id="modal-id-laporan" class="text-xs font-semibold text-blue-600 mb-0.5 font-mono"></p>
-                    <p id="modal-user-name" class="text-xs sm:text-sm font-bold text-slate-800 mb-3"></p>
+                    <p id="modal-user-name" class="text-xs sm:text-sm font-bold text-slate-800 mb-2"></p>
+
+                    <!-- Preview Poin-Poin Penting Berkas yang Diunggah -->
+                    <div id="modal-poin-penting-box" class="p-3 bg-amber-50/70 border border-amber-200 rounded-xl mb-3 text-xs">
+                        <div class="flex items-center justify-between gap-1 mb-1">
+                            <span class="font-bold text-amber-900 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                                <i class="fa-solid fa-list-check text-amber-600"></i> Poin-Poin Penting Berkas:
+                            </span>
+                            <a id="modal-file-link" href="#" target="_blank" class="text-blue-600 hover:text-blue-800 font-bold hover:underline text-[11px] flex items-center gap-1">
+                                <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> Buka File
+                            </a>
+                        </div>
+                        <p id="modal-poin-penting-text" class="text-slate-700 leading-relaxed font-medium whitespace-pre-line"></p>
+                        <p id="modal-file-name-text" class="text-[10px] text-slate-400 mt-1.5 truncate"></p>
+                    </div>
 
                     <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Status Verifikasi</label>
                     <select id="modal-status"
@@ -872,23 +886,47 @@
                     </div>
 
                     <div id="subcards-container-kepsek" class="hidden space-y-4">
-                        <div class="flex items-center justify-between bg-white p-3.5 sm:p-4 rounded-2xl border border-[#E8E2D5] shadow-xs gap-2">
-                            <button id="btn-back-folder-kepsek" onclick="ReportManager.backToFolderKepsek()"
-                                class="bg-[#F0EBE1] hover:bg-[#E5DFD3] text-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-[#E0D7C5] flex-shrink-0">
-                                <i class="fa-solid fa-arrow-left"></i> <span class="hidden sm:inline">Kembali</span>
-                            </button>
-                            <div class="truncate text-right sm:text-left">
-                                <h3 id="selected-school-title-kepsek" class="font-bold text-slate-800 text-xs sm:text-base truncate">Sekolah</h3>
-                                <p class="text-[10px] sm:text-xs text-slate-400">Pilih subfolder laporan kepala sekolah</p>
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between bg-white p-3.5 sm:p-4 rounded-2xl border border-[#E8E2D5] shadow-xs gap-3">
+                            <div class="flex items-center gap-2">
+                                <button id="btn-back-folder-kepsek" onclick="ReportManager.backToFolderKepsek()"
+                                    class="bg-[#F0EBE1] hover:bg-[#E5DFD3] text-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-[#E0D7C5] flex-shrink-0">
+                                    <i class="fa-solid fa-arrow-left"></i> <span class="hidden sm:inline">Kembali</span>
+                                </button>
+                                <div class="truncate text-left min-w-0">
+                                    <h3 id="selected-school-title-kepsek" class="font-bold text-slate-800 text-xs sm:text-base truncate">Sekolah</h3>
+                                    <p class="text-[10px] sm:text-xs text-slate-400">Pilih subfolder atau tinjau ringkasan poin penting</p>
+                                </div>
                             </div>
-                            <button onclick="ReportManager.openAddKepsekFolderModal(ReportManager.selectedSchoolState)"
-                                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex-shrink-0">
-                                <i class="fa-solid fa-folder-plus text-xs"></i> Tambah Folder Kepala Sekolah
-                            </button>
+
+                            <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-between sm:justify-end">
+                                <!-- Mode Tampilan: Folder vs Rekap Poin Penting -->
+                                <div class="flex items-center gap-1 bg-[#FAF8F5] p-1 rounded-xl border border-[#E0D7C5]">
+                                    <button id="btn-view-mode-folder-kepsek" onclick="ReportManager.switchViewMode('kepsek', 'folder')"
+                                        class="px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-white text-slate-800 shadow-xs border border-[#E8E2D5] flex items-center gap-1.5">
+                                        <i class="fa-solid fa-folder-tree text-amber-600"></i> <span>Folder</span>
+                                    </button>
+                                    <button id="btn-view-mode-summary-kepsek" onclick="ReportManager.switchViewMode('kepsek', 'summary')"
+                                        class="px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-600 hover:text-slate-800 flex items-center gap-1.5">
+                                        <i class="fa-solid fa-list-check text-blue-600"></i> <span>Poin Penting</span>
+                                        <span id="badge-pending-count-kepsek" class="hidden text-[9px] font-extrabold px-1.5 py-0.5 bg-amber-500 text-white rounded-full">0</span>
+                                    </button>
+                                </div>
+
+                                <button onclick="ReportManager.openAddKepsekFolderModal(ReportManager.selectedSchoolState)"
+                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex-shrink-0">
+                                    <i class="fa-solid fa-folder-plus text-xs"></i> <span class="hidden sm:inline">Tambah Folder</span>
+                                </button>
+                            </div>
                         </div>
 
+                        <!-- Mode 1: Grid Kartu Folder -->
                         <div id="grid-subcards-kepsek" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
                             <!-- Diisi secara dinamis oleh ReportManager.renderSubCardsKepsek(...) -->
+                        </div>
+
+                        <!-- Mode 2: Rekapitulasi & Poin Penting Dokumen Kepala Sekolah -->
+                        <div id="summary-container-kepsek" class="hidden space-y-4">
+                            <!-- Diisi secara dinamis oleh ReportManager.renderSummaryPoinPenting('kepsek') -->
                         </div>
                     </div>
 
@@ -912,7 +950,7 @@
                                         <tr>
                                             <th class="whitespace-nowrap">ID / Tanggal</th>
                                             <th class="whitespace-nowrap">Kepala Sekolah</th>
-                                            <th class="whitespace-nowrap">Kategori</th>
+                                            <th class="whitespace-nowrap">Kategori & Poin Penting</th>
                                             <th class="text-center whitespace-nowrap">Dokumen</th>
                                             <th class="text-center whitespace-nowrap">Status</th>
                                             <th class="whitespace-nowrap">Catatan</th>
@@ -937,23 +975,47 @@
                     </div>
 
                     <div id="subcards-container-guru" class="hidden space-y-4">
-                        <div class="flex items-center justify-between bg-white p-3.5 sm:p-4 rounded-2xl border border-[#E8E2D5] shadow-xs gap-2">
-                            <button id="btn-back-folder-guru" onclick="ReportManager.backToFolderGuru()"
-                                class="bg-[#F0EBE1] hover:bg-[#E5DFD3] text-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-[#E0D7C5] flex-shrink-0">
-                                <i class="fa-solid fa-arrow-left"></i> <span class="hidden sm:inline">Kembali</span>
-                            </button>
-                            <div class="truncate text-left flex-1 min-w-0">
-                                <h3 id="selected-school-title-guru" class="font-bold text-slate-800 text-xs sm:text-base truncate">Sekolah</h3>
-                                <p class="text-[10px] sm:text-xs text-slate-400">Pilih jenis pelaporan atau folder dokumen guru</p>
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between bg-white p-3.5 sm:p-4 rounded-2xl border border-[#E8E2D5] shadow-xs gap-3">
+                            <div class="flex items-center gap-2">
+                                <button id="btn-back-folder-guru" onclick="ReportManager.backToFolderGuru()"
+                                    class="bg-[#F0EBE1] hover:bg-[#E5DFD3] text-slate-700 px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-[#E0D7C5] flex-shrink-0">
+                                    <i class="fa-solid fa-arrow-left"></i> <span class="hidden sm:inline">Kembali</span>
+                                </button>
+                                <div class="truncate text-left flex-1 min-w-0">
+                                    <h3 id="selected-school-title-guru" class="font-bold text-slate-800 text-xs sm:text-base truncate">Sekolah</h3>
+                                    <p class="text-[10px] sm:text-xs text-slate-400">Pilih jenis pelaporan atau tinjau ringkasan poin penting guru</p>
+                                </div>
                             </div>
-                            <button id="btn-add-folder-guru" onclick="ReportManager.openAddGuruFolderModal()"
-                                class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm flex-shrink-0">
-                                <i class="fa-solid fa-folder-plus"></i> <span class="hidden sm:inline">Tambah Folder</span>
-                            </button>
+
+                            <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-between sm:justify-end">
+                                <!-- Mode Tampilan: Folder vs Rekap Poin Penting Guru -->
+                                <div class="flex items-center gap-1 bg-[#FAF8F5] p-1 rounded-xl border border-[#E0D7C5]">
+                                    <button id="btn-view-mode-folder-guru" onclick="ReportManager.switchViewMode('guru', 'folder')"
+                                        class="px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-white text-slate-800 shadow-xs border border-[#E8E2D5] flex items-center gap-1.5">
+                                        <i class="fa-solid fa-folder-tree text-emerald-600"></i> <span>Folder</span>
+                                    </button>
+                                    <button id="btn-view-mode-summary-guru" onclick="ReportManager.switchViewMode('guru', 'summary')"
+                                        class="px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-600 hover:text-slate-800 flex items-center gap-1.5">
+                                        <i class="fa-solid fa-list-check text-blue-600"></i> <span>Poin Penting Guru</span>
+                                        <span id="badge-pending-count-guru" class="hidden text-[9px] font-extrabold px-1.5 py-0.5 bg-emerald-600 text-white rounded-full">0</span>
+                                    </button>
+                                </div>
+
+                                <button id="btn-add-folder-guru" onclick="ReportManager.openAddGuruFolderModal()"
+                                    class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm flex-shrink-0">
+                                    <i class="fa-solid fa-folder-plus"></i> <span class="hidden sm:inline">Tambah Folder</span>
+                                </button>
+                            </div>
                         </div>
 
+                        <!-- Mode 1: Grid Kartu Folder -->
                         <div id="grid-subcards-guru" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
                             <!-- Diisi secara dinamis oleh ReportManager.renderSubCardsGuru(...) -->
+                        </div>
+
+                        <!-- Mode 2: Rekapitulasi & Poin Penting Dokumen Guru -->
+                        <div id="summary-container-guru" class="hidden space-y-4">
+                            <!-- Diisi secara dinamis oleh ReportManager.renderSummaryPoinPenting('guru') -->
                         </div>
                     </div>
 
@@ -977,7 +1039,7 @@
                                         <tr>
                                             <th class="whitespace-nowrap">ID / Tanggal</th>
                                             <th class="whitespace-nowrap">Nama Guru</th>
-                                            <th class="whitespace-nowrap">Kategori</th>
+                                            <th class="whitespace-nowrap">Kategori & Poin Penting</th>
                                             <th class="text-center whitespace-nowrap">Dokumen</th>
                                             <th class="text-center whitespace-nowrap">Status</th>
                                             <th class="whitespace-nowrap">Catatan</th>
@@ -1120,6 +1182,24 @@
                                 <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Pilih Kategori Laporan</label>
                                 <select id="kategori-laporan"
                                     class="w-full border border-[#DCD5C7] p-2.5 sm:p-3 rounded-xl focus:ring-2 focus:ring-blue-500 bg-[#FAF8F5] text-slate-700 text-xs font-semibold"></select>
+                            </div>
+
+                            <div>
+                                <div class="flex items-center justify-between mb-1 flex-wrap gap-1">
+                                    <label class="block text-xs font-bold text-slate-600 uppercase">
+                                        Poin-Poin Penting / Ringkasan Dokumen
+                                        <span class="text-blue-600 font-medium lowercase text-[11px]">(opsional, mempermudah verifikasi cepat)</span>
+                                    </label>
+                                    <span class="text-[10px] text-slate-400">Pilih saran cepat di bawah atau tulis mandiri</span>
+                                </div>
+                                <textarea id="poin-penting-laporan" rows="3"
+                                    placeholder="Contoh: Modul Ajar Bab 1-3 Lengkap, Sudah Direvisi Sesuai Kurikulum Merdeka, Terlampir Instrumen Asesmen Formatif"
+                                    class="w-full border border-[#DCD5C7] p-2.5 sm:p-3 rounded-xl focus:ring-2 focus:ring-blue-500 bg-[#FAF8F5] text-slate-700 text-xs font-medium placeholder:text-slate-400"></textarea>
+                                
+                                <!-- Rekomendasi / Chips Saran Poin Penting -->
+                                <div class="mt-1.5 flex flex-wrap gap-1.5" id="poin-penting-suggestions">
+                                    <!-- Diisi dinamis oleh ReportManager.renderPoinPentingSuggestions() -->
+                                </div>
                             </div>
 
                             <div>

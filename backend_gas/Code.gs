@@ -148,10 +148,10 @@ function initDatabase() {
 
   // 4. Sheet Laporan Kepsek & Guru
   ensureSheet(ss, SHEET_LAPORAN_KEPSEK, [
-    "ID", "Tanggal", "Nama", "Kategori", "FileUrl", "Status", "Catatan", "AsalSekolah", "JenisPelaporan", "NamaFile"
+    "ID", "Tanggal", "Nama", "Kategori", "FileUrl", "Status", "Catatan", "AsalSekolah", "JenisPelaporan", "NamaFile", "PoinPenting"
   ]);
   ensureSheet(ss, SHEET_LAPORAN_GURU, [
-    "ID", "Tanggal", "Nama", "Kategori", "FileUrl", "Status", "Catatan", "AsalSekolah", "JenisPelaporan", "NamaFile"
+    "ID", "Tanggal", "Nama", "Kategori", "FileUrl", "Status", "Catatan", "AsalSekolah", "JenisPelaporan", "NamaFile", "PoinPenting"
   ]);
 
   // 5. Sheet Audit Log (Rekam Jejak Aktivitas Pengguna untuk Pengawas)
@@ -166,6 +166,18 @@ function ensureSheet(ss, sheetName, headers) {
     sheet = ss.insertSheet(sheetName);
     sheet.appendRow(headers);
     sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBackground("#f1f5f9");
+  } else {
+    // Migrasi otomatis: jika kolom spreadsheet lama lebih sedikit dari headers terbaru
+    try {
+      const lastCol = sheet.getLastColumn();
+      if (lastCol < headers.length) {
+        for (let c = lastCol; c < headers.length; c++) {
+          sheet.getRange(1, c + 1).setValue(headers[c]).setFontWeight("bold").setBackground("#f1f5f9");
+        }
+      }
+    } catch (e) {
+      Logger.log("Info migrasi kolom sheet " + sheetName + ": " + e.toString());
+    }
   }
 }
 
@@ -1053,6 +1065,7 @@ function handleGetDashboardData(data) {
         asalSekolah: row[7],
         jenisPelaporan: row[8],
         namaFile: row[9] || "",
+        poinPenting: row[10] || "",
         sourceRole: "Kepala Sekolah"
       });
     }
@@ -1073,6 +1086,7 @@ function handleGetDashboardData(data) {
         asalSekolah: row[7],
         jenisPelaporan: row[8],
         namaFile: row[9] || "",
+        poinPenting: row[10] || "",
         sourceRole: "Guru"
       });
     }
@@ -1165,6 +1179,7 @@ function handleSyncAll(data) {
         asalSekolah: row[7],
         jenisPelaporan: row[8],
         namaFile: row[9] || "",
+        poinPenting: row[10] || "",
         sourceRole: "Kepala Sekolah"
       });
     }
@@ -1185,6 +1200,7 @@ function handleSyncAll(data) {
         asalSekolah: row[7],
         jenisPelaporan: row[8],
         namaFile: row[9] || "",
+        poinPenting: row[10] || "",
         sourceRole: "Guru"
       });
     }
@@ -1517,9 +1533,10 @@ function handleUploadFile(data) {
   const prefix = isKepsek ? "LPK-" : "LPG-";
   const newId = prefix + Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyyMMdd-HHmmss");
   const jenisPelaporan = reportFolderType || (kategori.indexOf("Daring") > -1 ? "Daring" : (kategori.indexOf("Mingguan") > -1 ? "Mingguan" : kategori));
+  const poinPenting = (data.poinPenting || "").trim();
 
   sheet.appendRow([
-    newId, new Date(), nama, kategori, fileUrl, "Menunggu Verifikasi", "Belum ada catatan", asalSekolah, jenisPelaporan, filename
+    newId, new Date(), nama, kategori, fileUrl, "Menunggu Verifikasi", "Belum ada catatan", asalSekolah, jenisPelaporan, filename, poinPenting
   ]);
 
   recordAuditLog(

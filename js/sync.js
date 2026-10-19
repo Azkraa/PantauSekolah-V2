@@ -376,6 +376,15 @@ const LiveSync = {
                 if (typeof ReportManager.renderSubCardsKepsek === "function") {
                     ReportManager.renderSubCardsKepsek(targetGuruSchool);
                 }
+                if (ReportManager.currentViewMode && ReportManager.currentViewMode.kepsek === "summary") {
+                    ReportManager.renderSummaryPoinPenting("kepsek");
+                }
+                if (ReportManager.currentViewMode && ReportManager.currentViewMode.guru === "summary") {
+                    ReportManager.renderSummaryPoinPenting("guru");
+                }
+                if (typeof ReportManager.updateBadgeCounts === "function") {
+                    ReportManager.updateBadgeCounts();
+                }
             }
 
             if (typeof ReportManager.populateUploadFolders === "function") {

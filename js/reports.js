@@ -9,6 +9,526 @@ const ReportManager = {
     selectedTypeState: "",
     activeSelectedId: "",
     activeTargetSheet: "",
+    currentViewMode: { kepsek: "folder", guru: "folder" },
+    summaryFilters: {
+        kepsek: { status: "all", search: "", teacher: "all" },
+        guru: { status: "all", search: "", teacher: "all" }
+    },
+
+    /**
+     * Mengambil poin-poin penting / ringkasan dokumen.
+     * Jika dokumen belum memiliki poin penting (misal data riwayat lama),
+     * diturunkan otomatis secara cerdas dari kategori, jenis pelaporan, dan nama berkas.
+     */
+    getPoinPenting(item) {
+        if (!item) return "-";
+        if (item.poinPenting && typeof item.poinPenting === "string" && item.poinPenting.trim() && item.poinPenting.trim() !== "-") {
+            return item.poinPenting.trim();
+        }
+
+        const str = ((item.kategori || "") + " " + (item.jenisPelaporan || "") + " " + (item.namaFile || item.filename || "")).toLowerCase();
+        const points = [];
+
+        if (str.includes("modul ajar") || str.includes("modul")) {
+            points.push("Modul Ajar & Perangkat Pembelajaran Kurikulum Merdeka");
+        } else if (str.includes("rpp") || str.includes("rencana pelaksanaan")) {
+            points.push("Rencana Pelaksanaan Pembelajaran (RPP) Semester");
+        }
+
+        if (str.includes("asesmen") || str.includes("penilaian") || str.includes("evaluasi") || str.includes("ujian") || str.includes("soal")) {
+            points.push("Instrumen & Rubrik Asesmen / Evaluasi Hasil Belajar");
+        }
+
+        if (str.includes("nilai") || str.includes("rekap") || str.includes("daftar nilai")) {
+            points.push("Rekapitulasi Daftar Nilai & Ketuntasan Belajar Siswa");
+        }
+
+        if (str.includes("absen") || str.includes("presensi") || str.includes("daftar hadir")) {
+            points.push("Presensi & Rekap Kehadiran Peserta Didik");
+        }
+
+        if (str.includes("jurnal") || str.includes("agenda")) {
+            points.push("Jurnal Mengajar & Agenda KBM Harian");
+        }
+
+        if (str.includes("rkas") || str.includes("bosp") || str.includes("bos") || str.includes("anggaran") || str.includes("spj")) {
+            points.push("Laporan Rencana Kegiatan & Anggaran Sekolah (RKAS / SPJ BOSP)");
+        }
+
+        if (str.includes("supervisi") || str.includes("kbm")) {
+            points.push("Instrumen & Hasil Pelaksanaan Supervisi Guru/Tendik");
+        }
+
+        if (str.includes("manajerial") || str.includes("program kerja") || str.includes("rkt")) {
+            points.push("Laporan Kinerja Manajerial & Rencana Kerja Tahunan (RKT)");
+        }
+
+        if (str.includes("kewirausahaan") || str.includes("kemitraan")) {
+            points.push("Program Kewirausahaan & Laporan Kemitraan Sekolah");
+        }
+
+        if (points.length === 0) {
+            const cat = item.kategori || item.jenisPelaporan || "Administrasi Sekolah";
+            const fname = item.namaFile || item.filename || "Berkas Laporan";
+            points.push(`Dokumen kelengkapan administrasi: ${cat}`);
+            points.push(`Berkas terunggah: ${fname}`);
+        }
+
+        return points.map(p => `• ${p}`).join("\n");
+    },
+
+    /**
+     * Beralih mode tampilan antara "Folder" dan "Poin Penting"
+     */
+    switchViewMode(type, mode) {
+        if (!this.currentViewMode) this.currentViewMode = { kepsek: "folder", guru: "folder" };
+        this.currentViewMode[type] = mode;
+
+        const btnFolder = document.getElementById(`btn-view-mode-folder-${type}`);
+        const btnSummary = document.getElementById(`btn-view-mode-summary-${type}`);
+        const gridFolder = document.getElementById(`grid-subcards-${type}`);
+        const containerSummary = document.getElementById(`summary-container-${type}`);
+
+        if (mode === "summary") {
+            if (btnFolder) {
+                btnFolder.className = "px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-600 hover:text-slate-800 flex items-center gap-1.5 cursor-pointer";
+            }
+            if (btnSummary) {
+                btnSummary.className = "px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-white text-slate-800 shadow-xs border border-[#E8E2D5] flex items-center gap-1.5 cursor-pointer";
+            }
+            if (gridFolder) gridFolder.classList.add("hidden");
+            if (containerSummary) {
+                containerSummary.classList.remove("hidden");
+                this.renderSummaryPoinPenting(type);
+            }
+        } else {
+            if (btnFolder) {
+                btnFolder.className = "px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-white text-slate-800 shadow-xs border border-[#E8E2D5] flex items-center gap-1.5 cursor-pointer";
+            }
+            if (btnSummary) {
+                btnSummary.className = "px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-slate-600 hover:text-slate-800 flex items-center gap-1.5 cursor-pointer";
+            }
+            if (gridFolder) gridFolder.classList.remove("hidden");
+            if (containerSummary) containerSummary.classList.add("hidden");
+        }
+        this.updateBadgeCounts();
+    },
+
+    /**
+     * Handler perubahan filter pada tampilan Poin Penting
+     */
+    onSummaryFilterChange(type, key, value) {
+        if (!this.summaryFilters) this.summaryFilters = {};
+        if (!this.summaryFilters[type]) {
+            this.summaryFilters[type] = { status: "all", search: "", teacher: "all" };
+        }
+        this.summaryFilters[type][key] = value;
+        this.renderSummaryPoinPenting(type);
+    },
+
+    /**
+     * Perbarui jumlah badge menunggu verifikasi pada tombol mode tampilan
+     */
+    updateBadgeCounts() {
+        const targetSchool = (this.selectedSchoolState || "").toLowerCase();
+        if (!targetSchool) return;
+
+        // Kepsek pending
+        const rawKepsek = (typeof DashboardManager !== "undefined" && DashboardManager.cachedData.reportsKepsek) ? DashboardManager.cachedData.reportsKepsek : [];
+        const pendingKepsek = rawKepsek.filter(x => (x.asalSekolah || "").toLowerCase() === targetSchool && x.status !== "Disetujui" && x.status !== "Perlu Perbaikan" && x.status !== "Ditolak").length;
+        const badgeKepsek = document.getElementById("badge-pending-count-kepsek");
+        if (badgeKepsek) {
+            if (pendingKepsek > 0) {
+                badgeKepsek.innerText = pendingKepsek;
+                badgeKepsek.classList.remove("hidden");
+            } else {
+                badgeKepsek.classList.add("hidden");
+            }
+        }
+
+        // Guru pending
+        const rawGuru = (typeof DashboardManager !== "undefined" && DashboardManager.cachedData.reportsGuru) ? DashboardManager.cachedData.reportsGuru : [];
+        const currentUser = typeof AuthService !== "undefined" ? AuthService.getUser() : null;
+        const isGuru = currentUser && currentUser.role === "Guru";
+        const pendingGuru = rawGuru.filter(x => {
+            if ((x.asalSekolah || "").toLowerCase() !== targetSchool) return false;
+            if (isGuru && (x.nama || "").toLowerCase() !== (currentUser.nama || "").toLowerCase()) return false;
+            return x.status !== "Disetujui" && x.status !== "Perlu Perbaikan" && x.status !== "Ditolak";
+        }).length;
+        const badgeGuru = document.getElementById("badge-pending-count-guru");
+        if (badgeGuru) {
+            if (pendingGuru > 0) {
+                badgeGuru.innerText = pendingGuru;
+                badgeGuru.classList.remove("hidden");
+            } else {
+                badgeGuru.classList.add("hidden");
+            }
+        }
+    },
+
+    /**
+     * Render Tampilan Rekapitulasi & Poin Penting Dokumen (Executive Summary Checklist)
+     */
+    renderSummaryPoinPenting(type) {
+        const container = document.getElementById(`summary-container-${type}`);
+        if (!container) return;
+
+        const schoolName = this.selectedSchoolState || "";
+        const currentUser = typeof AuthService !== "undefined" ? AuthService.getUser() : null;
+        const currentRole = currentUser ? currentUser.role : "";
+        const isPengawas = currentRole === "Pengawas";
+        const isKepsek = currentRole === "Kepala Sekolah" || currentRole === "Kepsek";
+        const isGuru = currentRole === "Guru";
+
+        const rawData = (type === "kepsek") 
+            ? ((typeof DashboardManager !== "undefined" && DashboardManager.cachedData.reportsKepsek) ? DashboardManager.cachedData.reportsKepsek : [])
+            : ((typeof DashboardManager !== "undefined" && DashboardManager.cachedData.reportsGuru) ? DashboardManager.cachedData.reportsGuru : []);
+
+        const targetSheet = (type === "kepsek") ? "Laporan_Kepsek" : "Laporan_Guru";
+
+        // Filter dokumen berdasarkan sekolah
+        let schoolReports = rawData.filter(x => (x.asalSekolah || "").toLowerCase() === schoolName.toLowerCase());
+
+        // Jika Guru membuka tab guru, hanya tampilkan laporannya sendiri
+        if (type === "guru" && isGuru) {
+            schoolReports = schoolReports.filter(x => (x.nama || "").trim().toLowerCase() === (currentUser.nama || "").trim().toLowerCase());
+        }
+
+        // Metrik kuantitatif dokumen
+        const totalCount = schoolReports.length;
+        const pendingCount = schoolReports.filter(x => x.status !== "Disetujui" && x.status !== "Perlu Perbaikan" && x.status !== "Ditolak").length;
+        const approvedCount = schoolReports.filter(x => x.status === "Disetujui").length;
+        const revisionCount = schoolReports.filter(x => x.status === "Perlu Perbaikan" || x.status === "Ditolak").length;
+
+        // Ambil filter yang aktif
+        if (!this.summaryFilters) this.summaryFilters = {};
+        if (!this.summaryFilters[type]) {
+            this.summaryFilters[type] = { status: "all", search: "", teacher: "all" };
+        }
+        const filter = this.summaryFilters[type];
+
+        // Daftar guru unik untuk dropdown filter (khusus tampilan guru)
+        const uniqueTeachers = Array.from(new Set(schoolReports.map(x => (x.nama || "").trim()).filter(Boolean))).sort();
+
+        // Terapkan filter
+        const displayList = schoolReports.filter(item => {
+            // Status
+            if (filter.status === "menunggu") {
+                if (item.status === "Disetujui" || item.status === "Perlu Perbaikan" || item.status === "Ditolak") return false;
+            } else if (filter.status === "disetujui") {
+                if (item.status !== "Disetujui") return false;
+            } else if (filter.status === "revisi") {
+                if (item.status !== "Perlu Perbaikan" && item.status !== "Ditolak") return false;
+            }
+
+            // Guru
+            if (type === "guru" && filter.teacher && filter.teacher !== "all") {
+                if ((item.nama || "").trim().toLowerCase() !== filter.teacher.trim().toLowerCase()) return false;
+            }
+
+            // Kata kunci pencarian
+            if (filter.search && filter.search.trim()) {
+                const q = filter.search.toLowerCase().trim();
+                const poin = this.getPoinPenting(item).toLowerCase();
+                const matched = (item.nama || "").toLowerCase().includes(q) ||
+                                (item.kategori || "").toLowerCase().includes(q) ||
+                                (item.jenisPelaporan || "").toLowerCase().includes(q) ||
+                                (item.namaFile || item.filename || "").toLowerCase().includes(q) ||
+                                (item.catatan || "").toLowerCase().includes(q) ||
+                                (item.id || "").toLowerCase().includes(q) ||
+                                poin.includes(q);
+                if (!matched) return false;
+            }
+
+            return true;
+        });
+
+        let html = `
+            <!-- Kartu KPI Ringkasan Status Dokumen -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3.5">
+                <div class="bg-white p-3 sm:p-4 rounded-xl border border-[#E8E2D5] shadow-2xs">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Berkas</p>
+                    <h4 class="text-lg sm:text-xl font-black text-slate-800 font-mono mt-0.5">${totalCount}</h4>
+                </div>
+                <div class="bg-amber-50/70 p-3 sm:p-4 rounded-xl border border-amber-200/80 shadow-2xs">
+                    <p class="text-[10px] font-bold text-amber-700 uppercase tracking-wider">Menunggu</p>
+                    <h4 class="text-lg sm:text-xl font-black text-amber-800 font-mono mt-0.5">${pendingCount}</h4>
+                </div>
+                <div class="bg-emerald-50/70 p-3 sm:p-4 rounded-xl border border-emerald-200/80 shadow-2xs">
+                    <p class="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Disetujui</p>
+                    <h4 class="text-lg sm:text-xl font-black text-emerald-800 font-mono mt-0.5">${approvedCount}</h4>
+                </div>
+                <div class="bg-rose-50/70 p-3 sm:p-4 rounded-xl border border-rose-200/80 shadow-2xs">
+                    <p class="text-[10px] font-bold text-rose-700 uppercase tracking-wider">Perlu Revisi</p>
+                    <h4 class="text-lg sm:text-xl font-black text-rose-800 font-mono mt-0.5">${revisionCount}</h4>
+                </div>
+            </div>
+
+            <!-- Toolbar Pencarian & Filter Cepat -->
+            <div class="bg-white p-3.5 sm:p-4 rounded-2xl border border-[#E8E2D5] shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                <div class="flex items-center gap-2 flex-1 flex-wrap sm:flex-nowrap">
+                    <!-- Search Input -->
+                    <div class="relative flex-1 min-w-[180px]">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+                        <input type="text"
+                            placeholder="Cari poin penting, berkas, atau pengirim..."
+                            value="${filter.search || ''}"
+                            oninput="ReportManager.onSummaryFilterChange('${type}', 'search', this.value)"
+                            class="w-full pl-8 pr-3 py-2 bg-[#FAF8F5] border border-[#DCD5C7] rounded-xl text-xs font-semibold text-slate-700 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500">
+                    </div>
+
+                    <!-- Dropdown Filter Status -->
+                    <select onchange="ReportManager.onSummaryFilterChange('${type}', 'status', this.value)"
+                        class="px-3 py-2 bg-[#FAF8F5] border border-[#DCD5C7] rounded-xl text-xs font-semibold text-slate-700 focus:ring-2 focus:ring-blue-500">
+                        <option value="all" ${filter.status === 'all' ? 'selected' : ''}>Semua Status</option>
+                        <option value="menunggu" ${filter.status === 'menunggu' ? 'selected' : ''}>⏳ Menunggu (${pendingCount})</option>
+                        <option value="disetujui" ${filter.status === 'disetujui' ? 'selected' : ''}>✅ Disetujui (${approvedCount})</option>
+                        <option value="revisi" ${filter.status === 'revisi' ? 'selected' : ''}>⚠️ Perlu Revisi (${revisionCount})</option>
+                    </select>
+
+                    <!-- Dropdown Filter Guru (Khusus tab guru untuk Pengawas & Kepsek) -->
+                    ${(type === "guru" && !isGuru && uniqueTeachers.length > 0) ? `
+                        <select onchange="ReportManager.onSummaryFilterChange('${type}', 'teacher', this.value)"
+                            class="px-3 py-2 bg-[#FAF8F5] border border-[#DCD5C7] rounded-xl text-xs font-semibold text-slate-700 focus:ring-2 focus:ring-blue-500 max-w-[160px] truncate">
+                            <option value="all" ${filter.teacher === 'all' ? 'selected' : ''}>Semua Guru (${uniqueTeachers.length})</option>
+                            ${uniqueTeachers.map(t => `<option value="${t}" ${filter.teacher === t ? 'selected' : ''}>${t}</option>`).join('')}
+                        </select>
+                    ` : ''}
+                </div>
+
+                <!-- Tombol Batch Approve (Persetujuan Massal 1-Klik) -->
+                ${(isPengawas || isKepsek) ? `
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                        <button onclick="ReportManager.batchApproveAll('${type}')"
+                            ${pendingCount === 0 ? 'disabled' : ''}
+                            class="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm ${pendingCount > 0 ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20 cursor-pointer' : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'}">
+                            <i class="fa-solid fa-check-double text-xs"></i>
+                            <span>Setujui Semua Menunggu (${pendingCount})</span>
+                        </button>
+                    </div>
+                ` : ''}
+            </div>
+
+            <!-- Daftar Kartu Poin Penting Dokumen -->
+            <div class="space-y-3.5">
+        `;
+
+        if (displayList.length === 0) {
+            html += `
+                <div class="bg-white p-8 sm:p-12 rounded-2xl border border-[#E8E2D5] text-center space-y-3">
+                    <div class="w-12 h-12 bg-slate-100 text-slate-400 rounded-2xl flex items-center justify-center mx-auto text-xl">
+                        <i class="fa-solid fa-list-check"></i>
+                    </div>
+                    <p class="font-bold text-sm text-slate-700">Tidak ada berkas yang sesuai kriteria</p>
+                    <p class="text-xs text-slate-400 max-w-sm mx-auto">Coba ubah kata kunci pencarian atau sesuaikan opsi filter status di atas.</p>
+                </div>
+            `;
+        } else {
+            displayList.forEach(item => {
+                const poin = this.getPoinPenting(item);
+                const isWaiting = item.status !== "Disetujui" && item.status !== "Perlu Perbaikan" && item.status !== "Ditolak";
+                const isOwner = currentUser && (item.nama || "").trim().toLowerCase() === (currentUser.nama || "").trim().toLowerCase();
+                const canVerify = isPengawas || isKepsek;
+                const canDelete = isPengawas || isOwner || (isKepsek && (item.asalSekolah || "").toLowerCase() === (currentUser.asal_sekolah || "").toLowerCase());
+                const fileIcon = this.getFileIcon(item.fileUrl, item.namaFile || item.filename, item.kategori);
+                const fname = item.namaFile || item.filename || item.kategori || "Berkas Laporan";
+                const safeName = (item.nama || "").replace(/'/g, "\\'");
+
+                html += `
+                    <div class="bg-white p-4 sm:p-5 rounded-2xl border border-[#E8E2D5] shadow-xs space-y-3 hover:border-blue-300 transition-all">
+                        <!-- Baris Atas: Pengunggah, Kategori, Status & Tanggal -->
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#F0EBE1] pb-2.5">
+                            <div class="flex items-center gap-2.5 flex-wrap">
+                                <span class="font-bold text-slate-800 text-xs sm:text-sm">${item.nama}</span>
+                                <span class="text-[10px] text-slate-400 font-mono">• ${item.tanggal}</span>
+                                <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                                    <i class="fa-solid fa-folder text-[9px] mr-1"></i>${item.jenisPelaporan || item.kategori}
+                                </span>
+                            </div>
+                            <div class="flex items-center gap-2 self-start sm:self-auto">
+                                ${DashboardManager.getStatusBadge(item.status)}
+                            </div>
+                        </div>
+
+                        <!-- Kotak Sorotan Poin-Poin Penting Dokumen -->
+                        <div class="bg-amber-50/60 border border-amber-200/90 rounded-xl p-3 sm:p-3.5 space-y-2">
+                            <div class="flex items-center justify-between gap-2">
+                                <span class="font-bold text-amber-950 text-xs flex items-center gap-1.5 uppercase tracking-wide">
+                                    <i class="fa-solid fa-list-check text-amber-600"></i> Poin-Poin Penting Dokumen:
+                                </span>
+                                <a href="${item.fileUrl}" target="_blank"
+                                    class="text-blue-600 hover:text-blue-800 font-bold hover:underline text-xs flex items-center gap-1 bg-white px-2.5 py-1 rounded-lg border border-blue-200 shadow-2xs transition-colors">
+                                    ${fileIcon} <span>Buka File Drive</span> <i class="fa-solid fa-arrow-up-right-from-square text-[9px] ml-0.5"></i>
+                                </a>
+                            </div>
+
+                            <div class="text-slate-800 text-xs font-medium leading-relaxed whitespace-pre-line pl-1">
+                                ${poin}
+                            </div>
+
+                            <div class="pt-2 border-t border-amber-200/50 flex items-center justify-between text-[10px] text-slate-500 font-medium">
+                                <span class="truncate max-w-[260px] sm:max-w-md"><i class="fa-solid fa-paperclip text-slate-400 mr-1"></i>${fname}</span>
+                                <span class="font-mono text-slate-400">ID: ${item.id}</span>
+                            </div>
+                        </div>
+
+                        <!-- Catatan Pembinaan / Evaluasi Jika Ada -->
+                        ${(item.catatan && item.catatan !== "-" && item.catatan !== "Belum ada catatan") ? `
+                            <div class="p-2.5 sm:p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs flex items-start gap-2">
+                                <i class="fa-solid fa-comment-dots text-slate-400 text-xs mt-0.5"></i>
+                                <div class="min-w-0 flex-1">
+                                    <span class="font-bold text-slate-600 text-[11px]">Catatan Evaluasi / Pembinaan:</span>
+                                    <p class="italic text-slate-700 font-medium mt-0.5">"${item.catatan}"</p>
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        <!-- Baris Aksi Cepat Bawah -->
+                        <div class="flex items-center justify-between gap-2 pt-1 flex-wrap">
+                            <div class="text-[11px] text-slate-400">
+                                ${isWaiting ? '<span class="text-amber-600 font-semibold"><i class="fa-regular fa-clock mr-1"></i>Menunggu evaluasi & persetujuan</span>' : '<span class="text-emerald-700 font-semibold"><i class="fa-solid fa-circle-check mr-1"></i>Telah dievaluasi</span>'}
+                            </div>
+
+                            <div class="flex items-center gap-1.5">
+                                ${canVerify ? (
+                                    isWaiting ? `
+                                        <button onclick="ReportManager.quickApproveReport('${item.id}', '${safeName}', '${targetSheet}')"
+                                            class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition-colors shadow-2xs flex items-center gap-1 cursor-pointer">
+                                            <i class="fa-solid fa-check"></i> Setujui Cepat
+                                        </button>
+                                        <button onclick="ReportManager.openModalVerifikasi('${item.id}', '${safeName}', '${item.status}', '${(item.catatan || '').replace(/'/g, "\\'")}', '${targetSheet}')"
+                                            class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition-colors shadow-2xs flex items-center gap-1 cursor-pointer">
+                                            <i class="fa-solid fa-file-circle-check"></i> Beri Catatan
+                                        </button>
+                                    ` : `
+                                        <button onclick="ReportManager.openModalVerifikasi('${item.id}', '${safeName}', '${item.status}', '${(item.catatan || '').replace(/'/g, "\\'")}', '${targetSheet}')"
+                                            class="bg-[#F0EBE1] hover:bg-[#E5DFD3] text-slate-700 font-bold px-3 py-1.5 rounded-xl text-xs transition-colors border border-[#E0D7C5] flex items-center gap-1 cursor-pointer">
+                                            <i class="fa-solid fa-pen-to-square"></i> Ubah Status
+                                        </button>
+                                    `
+                                ) : ''}
+
+                                ${canDelete ? `
+                                    <button onclick="ReportManager.confirmDeleteReport('${item.id}', '${safeName}', '${targetSheet}')"
+                                        title="Hapus Laporan"
+                                        class="bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold px-2.5 py-1.5 rounded-xl border border-rose-200 text-xs transition-colors cursor-pointer">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        html += `</div>`;
+        container.innerHTML = html;
+    },
+
+    /**
+     * Persetujuan Cepat 1-Klik untuk satu dokumen
+     */
+    quickApproveReport(idLaporan, namaPengirim, targetSheet) {
+        if (typeof LiveSync !== "undefined") {
+            LiveSync.optimisticVerifyReport(idLaporan, "Disetujui", "Disetujui melalui verifikasi cepat poin penting", targetSheet);
+            const type = (targetSheet === "Laporan_Kepsek") ? "kepsek" : "guru";
+            this.renderSummaryPoinPenting(type);
+            this.updateBadgeCounts();
+        }
+    },
+
+    /**
+     * Persetujuan Massal (Batch Approve All) untuk semua dokumen yang menunggu di sekolah ini
+     */
+    async batchApproveAll(type) {
+        const rawData = (type === "kepsek") 
+            ? ((typeof DashboardManager !== "undefined" && DashboardManager.cachedData.reportsKepsek) ? DashboardManager.cachedData.reportsKepsek : [])
+            : ((typeof DashboardManager !== "undefined" && DashboardManager.cachedData.reportsGuru) ? DashboardManager.cachedData.reportsGuru : []);
+
+        const targetSheet = (type === "kepsek") ? "Laporan_Kepsek" : "Laporan_Guru";
+        const schoolReports = rawData.filter(x => (x.asalSekolah || "").toLowerCase() === (this.selectedSchoolState || "").toLowerCase());
+        const pendingList = schoolReports.filter(x => x.status !== "Disetujui" && x.status !== "Perlu Perbaikan" && x.status !== "Ditolak");
+
+        if (pendingList.length === 0) {
+            App.showToast("Semua dokumen di sekolah ini sudah diverifikasi!", "info");
+            return;
+        }
+
+        const confirmed = await App.confirmModal({
+            title: `Setujui Semua Berkas (${pendingList.length} Berkas)`,
+            message: `Apakah Anda yakin ingin menyetujui sekaligus <strong>${pendingList.length} berkas</strong> yang sedang menunggu verifikasi di <strong>${this.selectedSchoolState}</strong>?`,
+            subMessage: "Status seluruh berkas akan diubah menjadi 'Disetujui' secara otomatis tanpa perlu membuka berkas satu per satu.",
+            confirmText: "Ya, Setujui Semua",
+            confirmType: "primary",
+            icon: "fa-solid fa-check-double"
+        });
+
+        if (confirmed) {
+            pendingList.forEach(item => {
+                if (typeof LiveSync !== "undefined") {
+                    LiveSync.optimisticVerifyReport(item.id, "Disetujui", "Disetujui sekaligus melalui verifikasi cepat poin penting", targetSheet);
+                }
+            });
+            App.showToast(`Berhasil menyetujui ${pendingList.length} berkas secara instan!`, "success");
+            this.renderSummaryPoinPenting(type);
+            this.updateBadgeCounts();
+        }
+    },
+
+    /**
+     * Render rekomendasi / chip saran cepat untuk poin penting pada form upload
+     */
+    renderPoinPentingSuggestions() {
+        const container = document.getElementById("poin-penting-suggestions");
+        if (!container) return;
+
+        const currentUser = typeof AuthService !== "undefined" ? AuthService.getUser() : null;
+        const isKepsek = currentUser && (currentUser.role === "Kepala Sekolah" || currentUser.role === "Kepsek");
+
+        const suggestionsKepsek = [
+            "Laporan Manajerial & Supervisi KBM Lengkap",
+            "SPJ & Realisasi BOSP Tahap 1 Sesuai Juknis",
+            "Evaluasi Diri Sekolah (EDS) & RKT Terlampir",
+            "Program Kerja Tahunan & Kalender Pendidikan",
+            "Laporan Kewirausahaan & Kemitraan DU/DI"
+        ];
+
+        const suggestionsGuru = [
+            "Modul Ajar Bab 1-3 Lengkap Kurikulum Merdeka",
+            "Instrumen & Rubrik Asesmen Formatif / Sumatif",
+            "Daftar Nilai & Rekap Ketuntasan Belajar Siswa",
+            "Jurnal Harian Mengajar & Presensi Kehadiran",
+            "Laporan Remedial & Pengayaan Peserta Didik"
+        ];
+
+        const list = isKepsek ? suggestionsKepsek : suggestionsGuru;
+
+        container.innerHTML = list.map(item => {
+            const safeText = item.replace(/'/g, "\\'");
+            return `
+                <button type="button" onclick="ReportManager.insertPoinSuggestion('${safeText}')"
+                    class="px-2.5 py-1 bg-[#FAF8F5] hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-[#DCD5C7] hover:border-blue-300 rounded-lg text-[11px] font-medium transition-all flex items-center gap-1 cursor-pointer">
+                    <i class="fa-solid fa-plus text-[9px] text-blue-500"></i> ${item}
+                </button>
+            `;
+        }).join("");
+    },
+
+    /**
+     * Masukkan chip saran ke dalam textarea poin penting laporan
+     */
+    insertPoinSuggestion(text) {
+        const textarea = document.getElementById("poin-penting-laporan");
+        if (!textarea) return;
+        const current = textarea.value.trim();
+        if (current) {
+            textarea.value = current + ", " + text;
+        } else {
+            textarea.value = text;
+        }
+        textarea.focus();
+    },
 
     /**
      * Memeriksa apakah folder sesuai untuk sekolah target (mencegah folder sekolah lain ikut muncul)
@@ -210,6 +730,8 @@ const ReportManager = {
         } else {
             this.renderSubCardsKepsek(schoolName);
         }
+        this.updateBadgeCounts();
+        this.switchViewMode(type, (this.currentViewMode && this.currentViewMode[type]) ? this.currentViewMode[type] : 'folder');
     },
 
     /**
@@ -373,6 +895,7 @@ const ReportManager = {
         }
 
         grid.innerHTML = html;
+        this.updateBadgeCounts();
     },
 
     /**
@@ -490,6 +1013,7 @@ const ReportManager = {
         }
 
         grid.innerHTML = html;
+        this.updateBadgeCounts();
     },
 
     /**
@@ -593,7 +1117,12 @@ const ReportManager = {
                         <p class="text-[10px] text-slate-400 font-medium">${item.tanggal}</p>
                     </td>
                     <td class="p-3.5 font-bold text-slate-800 whitespace-nowrap">${item.nama}</td>
-                    <td class="p-3.5 font-medium text-slate-700 whitespace-nowrap">${item.kategori}</td>
+                    <td class="p-3.5 text-slate-700 min-w-[200px] max-w-[340px]">
+                        <div class="font-bold text-slate-800 text-xs">${item.kategori}</div>
+                        <div class="text-[11px] text-slate-600 mt-1 line-clamp-2 leading-relaxed bg-amber-50/70 p-1.5 rounded-lg border border-amber-200/80" title="${ReportManager.getPoinPenting(item).replace(/"/g, '&quot;')}">
+                            <span class="font-semibold text-amber-800"><i class="fa-solid fa-list-check text-amber-600 text-[10px] mr-1"></i>Poin:</span> ${ReportManager.getPoinPenting(item).replace(/\n/g, ' ')}
+                        </div>
+                    </td>
                     <td class="p-3.5 text-center whitespace-nowrap">
                         <a href="${item.fileUrl}" target="_blank" class="inline-flex items-center gap-1.5 text-slate-700 hover:text-blue-700 font-bold bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 px-2.5 py-1 rounded-lg text-xs transition-colors shadow-2xs">
                             ${ReportManager.getFileIcon(item.fileUrl, item.namaFile || item.filename, item.kategori)} <span>Buka Berkas</span>
@@ -652,6 +1181,9 @@ const ReportManager = {
             if (this.selectedTypeState) {
                 this.openSubFolderTable(targetSheet === "Laporan_Kepsek" ? "kepsek" : "guru", this.selectedTypeState);
             }
+            const type = (targetSheet === "Laporan_Kepsek") ? "kepsek" : "guru";
+            this.renderSummaryPoinPenting(type);
+            this.updateBadgeCounts();
         }
     },
 
@@ -1141,6 +1673,33 @@ const ReportManager = {
         const catatanInput = document.getElementById("modal-catatan");
         catatanInput.value = (catatan !== "Belum ada catatan" && catatan !== "-") ? catatan : "";
 
+        // Tampilkan sorotan poin penting dokumen dan link berkas
+        const rawReports = (targetSheet === "Laporan_Kepsek")
+            ? ((typeof DashboardManager !== "undefined" && DashboardManager.cachedData.reportsKepsek) ? DashboardManager.cachedData.reportsKepsek : [])
+            : ((typeof DashboardManager !== "undefined" && DashboardManager.cachedData.reportsGuru) ? DashboardManager.cachedData.reportsGuru : []);
+
+        const reportItem = rawReports.find(x => x.id === id);
+
+        const poinBox = document.getElementById("modal-poin-penting-box");
+        const poinText = document.getElementById("modal-poin-penting-text");
+        const fileLink = document.getElementById("modal-file-link");
+        const fileNameText = document.getElementById("modal-file-name-text");
+
+        if (poinBox && poinText) {
+            const poin = reportItem ? this.getPoinPenting(reportItem) : "-";
+            poinText.innerText = poin || "Tidak ada ringkasan poin penting khusus.";
+            if (fileLink && reportItem && reportItem.fileUrl) {
+                fileLink.href = reportItem.fileUrl;
+                fileLink.classList.remove("hidden");
+            } else if (fileLink) {
+                fileLink.classList.add("hidden");
+            }
+            if (fileNameText && reportItem) {
+                const fname = reportItem.namaFile || reportItem.filename || reportItem.kategori || "Berkas Laporan";
+                fileNameText.innerHTML = `<i class="fa-solid fa-paperclip text-slate-400 mr-1"></i>Nama Berkas: <strong class="text-slate-600">${fname}</strong>`;
+            }
+        }
+
         document.getElementById("modal-verifikasi").classList.remove("hidden");
 
         // Auto-focus pada dropdown status verifikasi
@@ -1190,6 +1749,9 @@ const ReportManager = {
             if (this.selectedTypeState) {
                 this.openSubFolderTable(targetSheet === "Laporan_Kepsek" ? "kepsek" : "guru", this.selectedTypeState);
             }
+            const type = (targetSheet === "Laporan_Kepsek") ? "kepsek" : "guru";
+            this.renderSummaryPoinPenting(type);
+            this.updateBadgeCounts();
         }
     },
 
@@ -1367,6 +1929,9 @@ const ReportManager = {
                 submitBtn.classList.remove("opacity-50", "cursor-not-allowed");
             }
         }
+
+        // Render rekomendasi poin penting sesuai role pengguna
+        this.renderPoinPentingSuggestions();
     },
 
     /**
@@ -1384,6 +1949,8 @@ const ReportManager = {
         const jenisPelaporan = jenisPelaporanSelect ? jenisPelaporanSelect.value : "";
         const kategoriSelect = document.getElementById('kategori-laporan');
         const kategoriVal = kategoriSelect ? kategoriSelect.value : "";
+        const poinPentingInput = document.getElementById('poin-penting-laporan');
+        const poinPenting = poinPentingInput ? poinPentingInput.value.trim() : "";
 
         if (!jenisPelaporan) {
             App.showToast("Harap pilih jenis pelaporan / folder tujuan terlebih dahulu!", "error");
@@ -1446,6 +2013,7 @@ const ReportManager = {
                     asal_sekolah: user.asal_sekolah,
                     jenisPelaporan: jenisPelaporan,
                     kategori: kategori,
+                    poinPenting: poinPenting,
                     filename: fileInput.name,
                     mimeType: mimeType,
                     filebase64: fileBase64
@@ -1454,6 +2022,7 @@ const ReportManager = {
                 if (res.status === "success") {
                     App.showToast("Dokumen berhasil diunggah ke Google Drive & Sheets!", "success");
                     document.getElementById("upload-form").reset();
+                    if (poinPentingInput) poinPentingInput.value = "";
                     const nameDisplay = document.getElementById('file-name-display');
                     if (nameDisplay) nameDisplay.classList.add("hidden");
                     if (typeof LiveSync !== "undefined") {
@@ -1470,6 +2039,7 @@ const ReportManager = {
                 if (isTimeout) {
                     App.showToast("Proses unggah memakan waktu lebih lama. Dokumen sedang disimpan ke Google Drive, silakan periksa dashboard.", "warning");
                     document.getElementById("upload-form").reset();
+                    if (poinPentingInput) poinPentingInput.value = "";
                     const nameDisplay = document.getElementById('file-name-display');
                     if (nameDisplay) nameDisplay.classList.add("hidden");
                     setTimeout(() => {
