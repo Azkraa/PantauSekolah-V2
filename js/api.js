@@ -24,9 +24,17 @@ const ApiService = {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), effectiveTimeout);
 
+        const targetUrl = (typeof CONFIG !== "undefined" && CONFIG.API_URL) ? CONFIG.API_URL.trim() : "";
+        if (!targetUrl) {
+            clearTimeout(timeoutId);
+            throw new Error("Konfigurasi API_URL belum diatur di js/config.js.");
+        }
+
         try {
-            const response = await fetch(CONFIG.API_URL, {
+            const response = await fetch(targetUrl, {
                 method: "POST",
+                credentials: "omit", // Hindari redirect multi-login Google Account yang memicu 404
+                redirect: "follow",
                 body: JSON.stringify(payload),
                 signal: controller.signal
             });
@@ -34,6 +42,9 @@ const ApiService = {
             clearTimeout(timeoutId);
 
             if (!response.ok) {
+                if (response.status === 404) {
+                    throw new Error(`Server API tidak ditemukan (HTTP 404). Pastikan Web App Google Apps Script telah di-deploy dengan akses 'Anyone' dan URL di js/config.js berakhiran '/exec'.`);
+                }
                 throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
             }
 
@@ -44,7 +55,7 @@ const ApiService = {
             if (error.name === "AbortError") {
                 throw new Error("Permintaan ke server melebihi batas waktu (Timeout). Berkas sedang diproses di latar belakang.");
             }
-            console.error("API Request Error:", error);
+            console.error(`API Request Error [Action: ${payload?.action || 'unknown'}, URL: ${targetUrl}]:`, error);
             throw error;
         }
     }

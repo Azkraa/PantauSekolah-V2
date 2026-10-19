@@ -170,7 +170,8 @@ const App = {
                 this.showToast(res.message || "Login gagal.", "error");
             }
         } catch (error) {
-            this.showToast("Gagal terhubung dengan server saat login.", "error");
+            console.error("Login Error:", error);
+            this.showToast(error.message || "Gagal terhubung dengan server saat login.", "error");
         } finally {
             btnLogin.classList.remove("hidden");
             loadingLogin.classList.add("hidden");
