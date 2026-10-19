@@ -20,7 +20,7 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Custom Stylesheet (Warm Beige Edition) -->
-    <link rel="stylesheet" href="css/style.css?v=2.4.1">
+    <link rel="stylesheet" href="css/style.css?v=2.5.0">
 
     <!-- Immediate Session Checker (Mencegah kedipan login screen saat refresh atau buka tab baru) -->
     <script>
@@ -978,15 +978,60 @@
                     </div>
 
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                        <div class="bg-white p-4 sm:p-6 rounded-2xl border border-[#E8E2D5] shadow-xs">
-                            <h4 class="text-xs sm:text-sm font-bold text-slate-800 mb-3 sm:mb-4 flex items-center gap-2">
-                                <i class="fa-solid fa-chart-pie text-blue-600"></i> Distribusi Status Laporan
-                            </h4>
-                            <div class="relative h-48 sm:h-64 flex items-center justify-center">
+                        <!-- Card 1: Distribusi Status Laporan -->
+                        <div class="bg-white p-4 sm:p-6 rounded-2xl border border-[#E8E2D5] shadow-xs flex flex-col justify-between">
+                            <div>
+                                <div class="flex items-center justify-between mb-3 sm:mb-4 border-b border-[#F0EBE1] pb-3">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs font-bold border border-blue-100 shadow-2xs">
+                                            <i class="fa-solid fa-chart-pie"></i>
+                                        </div>
+                                        <h4 class="text-xs sm:text-sm font-bold text-slate-800 leading-tight">
+                                            Distribusi Status Laporan
+                                        </h4>
+                                    </div>
+                                    <span id="chart-status-total-badge" class="font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200 text-[10px]">
+                                        Total: 0 Berkas
+                                    </span>
+                                </div>
+                                <p class="text-[11px] text-slate-400 -mt-1.5 mb-2.5">
+                                    Persentase hasil verifikasi seluruh berkas yang masuk
+                                </p>
+                            </div>
+
+                            <div id="chart-status-wrapper" class="relative h-44 sm:h-52 flex items-center justify-center my-1">
                                 <canvas id="chartStatus"></canvas>
+                                <div id="chart-status-empty" class="hidden flex flex-col items-center justify-center text-center p-4">
+                                    <div class="w-11 h-11 rounded-2xl bg-[#FAF8F5] border border-[#E8E2D5] flex items-center justify-center text-slate-300 text-lg mb-2 shadow-2xs">
+                                        <i class="fa-solid fa-chart-pie"></i>
+                                    </div>
+                                    <p class="text-xs font-bold text-slate-700">Belum Ada Berkas Laporan</p>
+                                    <p class="text-[11px] text-slate-400 max-w-[210px] mt-0.5">Grafik status akan otomatis terisi saat laporan diunggah.</p>
+                                </div>
+                            </div>
+
+                            <!-- Mini Status Pills Footer for Visual Balance -->
+                            <div id="chart-status-pills" class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 border-t border-[#F0EBE1] mt-2">
+                                <div class="bg-emerald-50/70 border border-emerald-100 rounded-xl p-2 text-center">
+                                    <p class="text-[10px] font-bold text-emerald-600">Disetujui</p>
+                                    <p id="mini-stat-disetujui" class="text-sm font-extrabold text-emerald-800">0</p>
+                                </div>
+                                <div class="bg-blue-50/70 border border-blue-100 rounded-xl p-2 text-center">
+                                    <p class="text-[10px] font-bold text-blue-600">Menunggu</p>
+                                    <p id="mini-stat-menunggu" class="text-sm font-extrabold text-blue-800">0</p>
+                                </div>
+                                <div class="bg-amber-50/70 border border-amber-100 rounded-xl p-2 text-center">
+                                    <p class="text-[10px] font-bold text-amber-600">Perbaikan</p>
+                                    <p id="mini-stat-perbaikan" class="text-sm font-extrabold text-amber-800">0</p>
+                                </div>
+                                <div class="bg-rose-50/70 border border-rose-100 rounded-xl p-2 text-center">
+                                    <p class="text-[10px] font-bold text-rose-600">Ditolak</p>
+                                    <p id="mini-stat-ditolak" class="text-sm font-extrabold text-rose-800">0</p>
+                                </div>
                             </div>
                         </div>
 
+                        <!-- Card 2: Kepatuhan Unggah Tiap Sekolah -->
                         <div class="bg-white p-4 sm:p-6 rounded-2xl border border-[#E8E2D5] shadow-xs flex flex-col justify-between">
                             <!-- Header Card dengan Judul, Dropdown Filter Folder, & Subtitle -->
                             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3 sm:mb-4 border-b border-[#F0EBE1] pb-3">
@@ -1006,10 +1051,10 @@
 
                                 <!-- Kontrol Filter Folder Dropdown -->
                                 <div class="flex items-center gap-2 flex-wrap">
-                                    <div class="relative min-w-[170px] sm:min-w-[210px]">
+                                    <div class="relative min-w-[150px] sm:min-w-[180px]">
                                         <select id="select-filter-chart-folder" onchange="DashboardManager.onChartFolderFilterChange(this.value)"
                                             class="w-full text-xs font-semibold text-slate-700 bg-[#FAF8F5] border border-[#DCD5C7] rounded-xl px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 pr-7 truncate shadow-2xs cursor-pointer">
-                                            <option value="all">📂 Semua Folder (Kelengkapan Total)</option>
+                                            <option value="all">📂 Semua Folder</option>
                                         </select>
                                         <i class="fa-solid fa-chevron-down absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-[10px] pointer-events-none"></i>
                                     </div>
@@ -1027,14 +1072,14 @@
                             </div>
 
                             <!-- Area Canvas Grafik dengan Scroll Responsif jika ada banyak sekolah -->
-                            <div id="chart-sekolah-scroll-wrapper" class="relative max-h-[300px] overflow-y-auto pr-1">
-                                <div id="chart-sekolah-canvas-wrapper" class="relative h-48 sm:h-64 flex items-center justify-center">
+                            <div id="chart-sekolah-scroll-wrapper" class="relative max-h-[220px] overflow-y-auto pr-1">
+                                <div id="chart-sekolah-canvas-wrapper" class="relative h-40 sm:h-48 flex items-center justify-center">
                                     <canvas id="chartPerbandingan"></canvas>
                                 </div>
                             </div>
 
                             <!-- Daftar Sekolah Perlu Perhatian (diisi oleh JS) -->
-                            <div id="chart-attention-list" class="hidden mt-3 space-y-1.5 text-xs"></div>
+                            <div id="chart-attention-list" class="hidden mt-3"></div>
                         </div>
                     </div>
 
@@ -1704,16 +1749,16 @@
     </div>
 
     <!-- SCRIPT DEPENDENCIES (MODULAR LOAD ORDER) -->
-    <script src="js/config.js?v=2.4.1"></script>
-    <script src="js/api.js?v=2.4.1"></script>
-    <script src="js/auth.js?v=2.4.1"></script>
-    <script src="js/sync.js?v=2.4.1"></script>
-    <script src="js/users.js?v=2.4.1"></script>
-    <script src="js/drive.js?v=2.4.1"></script>
-    <script src="js/reports.js?v=2.4.1"></script>
-    <script src="js/dashboard.js?v=2.4.1"></script>
-    <script src="js/audit.js?v=2.4.1"></script>
-    <script src="js/app.js?v=2.4.1"></script>
+    <script src="js/config.js?v=2.5.0"></script>
+    <script src="js/api.js?v=2.5.0"></script>
+    <script src="js/auth.js?v=2.5.0"></script>
+    <script src="js/sync.js?v=2.5.0"></script>
+    <script src="js/users.js?v=2.5.0"></script>
+    <script src="js/drive.js?v=2.5.0"></script>
+    <script src="js/reports.js?v=2.5.0"></script>
+    <script src="js/dashboard.js?v=2.5.0"></script>
+    <script src="js/audit.js?v=2.5.0"></script>
+    <script src="js/app.js?v=2.5.0"></script>
 </body>
 
 </html>
