@@ -151,6 +151,7 @@ const DashboardManager = {
     /**
      * Dapatkan daftar seluruh folder laporan aktif yang BENAR-BENAR dibuat pengawas di Google Drive.
      * Hanya dari LiveSync.state.folders / DriveManager.cachedFolders — tanpa hardcoded defaults.
+     * Folder harus memiliki driveFolderUrl yang valid (URL Google Drive nyata).
      */
     getAllAvailableFolders() {
         const folderSet = new Set();
@@ -163,7 +164,9 @@ const DashboardManager = {
         customFolders.forEach(f => {
             if (f && f.namaFolder
                 && !f.namaFolder.startsWith("__DELETED__:")
-                && !String(f.id || "").startsWith("DEL-")) {
+                && !String(f.id || "").startsWith("DEL-")
+                && f.driveFolderUrl
+                && f.driveFolderUrl.toString().startsWith("https://")) {
                 folderSet.add(f.namaFolder.trim());
             }
         });
