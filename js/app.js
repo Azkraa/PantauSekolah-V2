@@ -371,15 +371,22 @@ const App = {
             subTitleEl.innerText = "Folder per sekolah untuk laporan administrasi dan manajemen Kepala Sekolah";
             const currentUser = typeof AuthService !== "undefined" ? AuthService.getUser() : null;
             const isPengawas = currentUser && currentUser.role === "Pengawas";
+            const schools = (typeof DashboardManager !== "undefined" && DashboardManager.cachedData.schools) 
+                ? DashboardManager.cachedData.schools 
+                : [];
             let savedSchool = null;
             if (isPengawas) {
                 try {
                     savedSchool = localStorage.getItem("pantausekolah_selected_school");
                 } catch (e) {}
             }
-            if (savedSchool) {
+            const schoolExists = savedSchool && schools.some(s => (s.nama || "").toLowerCase() === savedSchool.toLowerCase());
+            if (savedSchool && schoolExists) {
                 ReportManager.openSchoolFolder('kepsek', savedSchool);
             } else {
+                try {
+                    localStorage.removeItem("pantausekolah_selected_school");
+                } catch (e) {}
                 ReportManager.backToFolderKepsek();
             }
         } else if (tabName === 'verifikasi-guru') {
@@ -399,13 +406,20 @@ const App = {
             if ((isKepsek || isGuru) && currentUser.asal_sekolah) {
                 ReportManager.openSchoolFolder('guru', currentUser.asal_sekolah);
             } else if (isPengawas) {
+                const schools = (typeof DashboardManager !== "undefined" && DashboardManager.cachedData.schools) 
+                    ? DashboardManager.cachedData.schools 
+                    : [];
                 let savedSchool = null;
                 try {
                     savedSchool = localStorage.getItem("pantausekolah_selected_school");
                 } catch (e) {}
-                if (savedSchool) {
+                const schoolExists = savedSchool && schools.some(s => (s.nama || "").toLowerCase() === savedSchool.toLowerCase());
+                if (savedSchool && schoolExists) {
                     ReportManager.openSchoolFolder('guru', savedSchool);
                 } else {
+                    try {
+                        localStorage.removeItem("pantausekolah_selected_school");
+                    } catch (e) {}
                     ReportManager.backToFolderGuru();
                 }
             } else {

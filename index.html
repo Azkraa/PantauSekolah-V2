@@ -993,86 +993,103 @@
 
                 <!-- 3B. TAB FOLDER DOKUMEN SEKOLAH (MODUL DEDIKASI KEPALA SEKOLAH) -->
                 <div id="tab-folder-sekolah" class="hidden space-y-5 sm:space-y-6">
-                    <!-- Banner Info Sekolah & Kontrol Cepat -->
-                    <div class="bg-white p-5 sm:p-6 rounded-2xl border border-[#E8E2D5] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div class="flex items-center gap-3.5 min-w-0">
-                            <div class="w-12 h-12 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center text-2xl font-bold flex-shrink-0">
-                                <i class="fa-solid fa-folder-tree"></i>
-                            </div>
-                            <div class="min-w-0">
-                                <div class="flex items-center gap-2 flex-wrap">
-                                    <h3 id="folder-sekolah-title" class="font-extrabold text-slate-800 text-base sm:text-lg">Folder Dokumen Sekolah</h3>
-                                    <span id="folder-sekolah-badge" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">SD</span>
-                                </div>
-                                <p class="text-xs text-slate-400 mt-0.5">Kelola folder dokumen guru serta pantau arsip terlindungi kepala sekolah</p>
-                            </div>
+                    <!-- Tampilan Kosong (Jika Belum Ada Sekolah Binaan) -->
+                    <div id="wrapper-folder-sekolah-empty" class="hidden bg-white p-8 sm:p-12 rounded-2xl border border-[#E8E2D5] text-center space-y-3">
+                        <div class="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto text-2xl border border-indigo-100">
+                            <i class="fa-solid fa-school-circle-xmark"></i>
                         </div>
-                        <div class="flex items-center gap-2.5 flex-wrap">
-                            <a id="folder-sekolah-root-drive-btn" href="#" target="_blank" rel="noopener noreferrer"
-                                class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all">
-                                <i class="fa-brands fa-google-drive text-sm"></i> Buka Root Google Drive
-                            </a>
-                            <button id="folder-sekolah-add-btn" onclick="ReportManager.openAddGuruFolderModal()"
-                                class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all">
-                                <i class="fa-solid fa-folder-plus text-sm"></i> Tambah Folder Guru
+                        <h3 class="font-bold text-slate-800 text-base">Belum Ada Sekolah Terdaftar</h3>
+                        <p id="label-folder-sekolah-empty-msg" class="text-xs text-slate-400 max-w-md mx-auto">Belum ada laporan atau data sekolah binaan yang terdaftar pada sistem.</p>
+                        <div class="pt-2">
+                            <button onclick="App.switchTab('user-manager')" class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs shadow-sm transition-all">
+                                <i class="fa-solid fa-plus"></i> Buka Manajemen Pengguna & Sekolah
                             </button>
                         </div>
                     </div>
 
-                    <!-- Dropdown Pilihan Sekolah (Khusus Pengawas jika ingin memeriksa sekolah lain) -->
-                    <div id="wrapper-folder-sekolah-switcher" class="hidden bg-white p-3.5 sm:p-4 rounded-2xl border border-[#E8E2D5] shadow-xs flex items-center justify-between gap-3">
-                        <div class="flex items-center gap-2">
-                            <i class="fa-solid fa-school text-slate-400 text-xs"></i>
-                            <span class="text-xs font-bold text-slate-700">Pilih Sekolah:</span>
-                        </div>
-                        <div id="pills-folder-sekolah-schools" class="flex items-center gap-1.5 flex-wrap"></div>
-                    </div>
-
-                    <!-- BAGIAN 1: FOLDER LAPORAN GURU (DAPAT DIKELOLA & DIHAPUS OLEH KEPALA SEKOLAH) -->
-                    <div class="space-y-3">
-                        <div class="flex items-center justify-between flex-wrap gap-2">
-                            <div class="flex items-center gap-2">
-                                <div class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm font-bold border border-emerald-100">
-                                    <i class="fa-solid fa-chalkboard-user"></i>
+                    <!-- Konten Folder Dokumen Sekolah (Tampil Jika Sekolah Ada) -->
+                    <div id="wrapper-folder-sekolah-content" class="space-y-5 sm:space-y-6">
+                        <!-- Banner Info Sekolah & Kontrol Cepat -->
+                        <div class="bg-white p-5 sm:p-6 rounded-2xl border border-[#E8E2D5] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div class="flex items-center gap-3.5 min-w-0">
+                                <div class="w-12 h-12 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center text-2xl font-bold flex-shrink-0">
+                                    <i class="fa-solid fa-folder-tree"></i>
                                 </div>
-                                <div>
-                                    <h4 class="font-bold text-slate-800 text-sm sm:text-base">1. Folder Dokumen & Laporan Guru</h4>
-                                    <p class="text-[11px] text-slate-400">Folder berkas KBM, RPP, dan administrasi guru. Kepala Sekolah berwenang menambah dan menghapus folder di bagian ini.</p>
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <h3 id="folder-sekolah-title" class="font-extrabold text-slate-800 text-base sm:text-lg">Folder Dokumen Sekolah</h3>
+                                        <span id="folder-sekolah-badge" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">SD</span>
+                                    </div>
+                                    <p class="text-xs text-slate-400 mt-0.5">Kelola folder dokumen guru serta pantau arsip terlindungi kepala sekolah</p>
                                 </div>
                             </div>
-                            <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100 flex items-center gap-1">
-                                <i class="fa-solid fa-unlock-keyhole"></i> Dapat Dikelola (Hapus / Tambah)
-                            </span>
-                        </div>
-                        <div id="grid-folder-sekolah-guru" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-                            <!-- Diisi secara dinamis oleh ReportManager.renderFolderSekolahView -->
-                        </div>
-                    </div>
-
-                    <!-- BAGIAN 2: FOLDER LAPORAN KEPALA SEKOLAH (TERKUNCI & TIDAK DAPAT DIHAPUS OLEH KEPALA SEKOLAH) -->
-                    <div class="space-y-3 pt-2">
-                        <div class="flex items-center justify-between flex-wrap gap-2">
-                            <div class="flex items-center gap-2">
-                                <div class="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-sm font-bold border border-amber-100">
-                                    <i class="fa-solid fa-user-tie"></i>
-                                </div>
-                                <div>
-                                    <h4 class="font-bold text-slate-800 text-sm sm:text-base">2. Folder Arsip Laporan Kepala Sekolah</h4>
-                                    <p class="text-[11px] text-slate-400">Folder arsip dokumen dan administrasi Kepala Sekolah.</p>
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <span class="text-[10px] font-bold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 flex items-center gap-1.5">
-                                    <i class="fa-solid fa-lock text-amber-600"></i> Terkunci • Arsip Kepala Sekolah
-                                </span>
-                                <button id="folder-sekolah-add-kepsek-btn" onclick="ReportManager.openAddKepsekFolderModal(ReportManager.selectedSchoolFolderSekolah || ReportManager.selectedSchoolState)"
-                                    class="hidden inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-xs hover:shadow-md transition-all">
-                                    <i class="fa-solid fa-folder-plus text-xs"></i> Tambah Folder Kepala Sekolah
+                            <div class="flex items-center gap-2.5 flex-wrap">
+                                <a id="folder-sekolah-root-drive-btn" href="#" target="_blank" rel="noopener noreferrer"
+                                    class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all">
+                                    <i class="fa-brands fa-google-drive text-sm"></i> Buka Root Google Drive
+                                </a>
+                                <button id="folder-sekolah-add-btn" onclick="ReportManager.openAddGuruFolderModal()"
+                                    class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all">
+                                    <i class="fa-solid fa-folder-plus text-sm"></i> Tambah Folder Guru
                                 </button>
                             </div>
                         </div>
-                        <div id="grid-folder-sekolah-kepsek" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-                            <!-- Diisi secara dinamis oleh ReportManager.renderFolderSekolahView -->
+
+                        <!-- Dropdown Pilihan Sekolah (Khusus Pengawas jika ingin memeriksa sekolah lain) -->
+                        <div id="wrapper-folder-sekolah-switcher" class="hidden bg-white p-3.5 sm:p-4 rounded-2xl border border-[#E8E2D5] shadow-xs flex items-center justify-between gap-3">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-school text-slate-400 text-xs"></i>
+                                <span class="text-xs font-bold text-slate-700">Pilih Sekolah:</span>
+                            </div>
+                            <div id="pills-folder-sekolah-schools" class="flex items-center gap-1.5 flex-wrap"></div>
+                        </div>
+
+                        <!-- BAGIAN 1: FOLDER LAPORAN GURU (DAPAT DIKELOLA & DIHAPUS OLEH KEPALA SEKOLAH) -->
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between flex-wrap gap-2">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm font-bold border border-emerald-100">
+                                        <i class="fa-solid fa-chalkboard-user"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-bold text-slate-800 text-sm sm:text-base">1. Folder Dokumen & Laporan Guru</h4>
+                                        <p class="text-[11px] text-slate-400">Folder berkas KBM, RPP, dan administrasi guru. Kepala Sekolah berwenang menambah dan menghapus folder di bagian ini.</p>
+                                    </div>
+                                </div>
+                                <span class="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100 flex items-center gap-1">
+                                    <i class="fa-solid fa-unlock-keyhole"></i> Dapat Dikelola (Hapus / Tambah)
+                                </span>
+                            </div>
+                            <div id="grid-folder-sekolah-guru" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                                <!-- Diisi secara dinamis oleh ReportManager.renderFolderSekolahView -->
+                            </div>
+                        </div>
+
+                        <!-- BAGIAN 2: FOLDER LAPORAN KEPALA SEKOLAH (TERKUNCI & TIDAK DAPAT DIHAPUS OLEH KEPALA SEKOLAH) -->
+                        <div class="space-y-3 pt-2">
+                            <div class="flex items-center justify-between flex-wrap gap-2">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-sm font-bold border border-amber-100">
+                                        <i class="fa-solid fa-user-tie"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-bold text-slate-800 text-sm sm:text-base">2. Folder Arsip Laporan Kepala Sekolah</h4>
+                                        <p class="text-[11px] text-slate-400">Folder arsip dokumen dan administrasi Kepala Sekolah.</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[10px] font-bold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 flex items-center gap-1.5">
+                                        <i class="fa-solid fa-lock text-amber-600"></i> Terkunci • Arsip Kepala Sekolah
+                                    </span>
+                                    <button id="folder-sekolah-add-kepsek-btn" onclick="ReportManager.openAddKepsekFolderModal(ReportManager.selectedSchoolFolderSekolah || ReportManager.selectedSchoolState)"
+                                        class="hidden inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-xs hover:shadow-md transition-all">
+                                        <i class="fa-solid fa-folder-plus text-xs"></i> Tambah Folder Kepala Sekolah
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="grid-folder-sekolah-kepsek" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                                <!-- Diisi secara dinamis oleh ReportManager.renderFolderSekolahView -->
+                            </div>
                         </div>
                     </div>
                 </div>

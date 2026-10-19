@@ -384,10 +384,28 @@ const LiveSync = {
 
             // Re-render Tab Folder Dokumen Sekolah (modul Kepala Sekolah)
             if (typeof ReportManager.renderFolderSekolahView === "function") {
-                const firstSchoolName = (this.state.schools && this.state.schools[0]) ? this.state.schools[0].nama : "";
-                const schToRender = isKepsek ? curUser.asal_sekolah : (ReportManager.selectedSchoolFolderSekolah || firstSchoolName);
-                if (schToRender) {
-                    ReportManager.renderFolderSekolahView(schToRender);
+                const schools = this.state.schools || [];
+                const firstSchoolName = (schools[0]) ? schools[0].nama : "";
+                if (isKepsek) {
+                    if (curUser.asal_sekolah) {
+                        ReportManager.renderFolderSekolahView(curUser.asal_sekolah);
+                    } else if (typeof ReportManager.renderFolderSekolahEmptyState === "function") {
+                        ReportManager.renderFolderSekolahEmptyState("Data sekolah untuk akun Kepala Sekolah Anda belum dikonfigurasikan.");
+                    }
+                } else {
+                    // Pengawas
+                    if (schools.length === 0) {
+                        if (typeof ReportManager.renderFolderSekolahEmptyState === "function") {
+                            ReportManager.renderFolderSekolahEmptyState("Belum ada laporan atau data sekolah binaan yang terdaftar pada sistem.");
+                        }
+                    } else {
+                        const validSchool = (ReportManager.selectedSchoolFolderSekolah && schools.some(s => (s.nama || "").toLowerCase() === ReportManager.selectedSchoolFolderSekolah.toLowerCase()))
+                            ? ReportManager.selectedSchoolFolderSekolah
+                            : firstSchoolName;
+                        if (validSchool) {
+                            ReportManager.renderFolderSekolahView(validSchool);
+                        }
+                    }
                 }
             }
 

@@ -70,7 +70,8 @@ const ReportManager = {
         });
 
         data.forEach(item => {
-            const school = item.asalSekolah || userSchool || "SD 04 Pinoh";
+            const school = (item.asalSekolah || userSchool || "").trim();
+            if (!school) return;
             if (!isPengawas && userSchool && school.toLowerCase() !== userSchool.toLowerCase()) {
                 return; // Lewati sekolah lain
             }
@@ -140,6 +141,34 @@ const ReportManager = {
      * Buka Langkah 2: Pilihan Subfolder Mingguan / Daring / Custom
      */
     openSchoolFolder(type, schoolName) {
+        const currentUser = typeof AuthService !== "undefined" ? AuthService.getUser() : null;
+        const isPengawas = currentUser && currentUser.role === "Pengawas";
+        const isGuru = currentUser && currentUser.role === "Guru";
+
+        const schoolsMeta = (typeof DashboardManager !== "undefined" && DashboardManager.cachedData.schools) 
+            ? DashboardManager.cachedData.schools 
+            : [];
+
+        if (isPengawas) {
+            if (!schoolsMeta || schoolsMeta.length === 0) {
+                try {
+                    localStorage.removeItem("pantausekolah_selected_school");
+                } catch (e) {}
+                if (type === 'kepsek') this.backToFolderKepsek();
+                else this.backToFolderGuru();
+                return;
+            }
+            const exists = schoolsMeta.some(s => (s.nama || "").toLowerCase() === (schoolName || "").toLowerCase());
+            if (!exists) {
+                try {
+                    localStorage.removeItem("pantausekolah_selected_school");
+                } catch (e) {}
+                if (type === 'kepsek') this.backToFolderKepsek();
+                else this.backToFolderGuru();
+                return;
+            }
+        }
+
         this.selectedSchoolState = schoolName;
         this.selectedTypeState = ""; // Reset pilihan subfolder/tabel agar kembali ke tampilan kartu folder
 
@@ -148,11 +177,6 @@ const ReportManager = {
         document.getElementById(`table-container-${type}`).classList.add("hidden");
 
         document.getElementById(`selected-school-title-${type}`).innerText = schoolName;
-
-        // Kontrol tombol kembali & tambah folder sesuai peran
-        const currentUser = typeof AuthService !== "undefined" ? AuthService.getUser() : null;
-        const isPengawas = currentUser && currentUser.role === "Pengawas";
-        const isGuru = currentUser && currentUser.role === "Guru";
 
         if (isPengawas) {
             try {
@@ -179,7 +203,7 @@ const ReportManager = {
         }
 
         const rawData = (type === 'kepsek') ? DashboardManager.cachedData.reportsKepsek : DashboardManager.cachedData.reportsGuru;
-        const schoolReports = rawData.filter(x => (x.asalSekolah || "SD 04 Pinoh").toLowerCase() === schoolName.toLowerCase());
+        const schoolReports = rawData.filter(x => (x.asalSekolah || "").toLowerCase() === schoolName.toLowerCase());
 
         if (type === 'guru') {
             this.renderSubCardsGuru(schoolName);
@@ -1483,6 +1507,21 @@ const ReportManager = {
     },
 
     /**
+     * Tampilkan state kosong pada modul Folder Dokumen Sekolah
+     */
+    renderFolderSekolahEmptyState(message) {
+        const emptyWrapper = document.getElementById("wrapper-folder-sekolah-empty");
+        const contentWrapper = document.getElementById("wrapper-folder-sekolah-content");
+        const msgEl = document.getElementById("label-folder-sekolah-empty-msg");
+
+        if (contentWrapper) contentWrapper.classList.add("hidden");
+        if (emptyWrapper) {
+            emptyWrapper.classList.remove("hidden");
+            if (msgEl && message) msgEl.innerText = message;
+        }
+    },
+
+    /**
      * Memuat modul khusus: Folder Dokumen Sekolah (Dedicated untuk Kepala Sekolah & Pengawas)
      */
     loadFolderSekolahView() {
@@ -1490,20 +1529,54 @@ const ReportManager = {
         if (!user) return;
 
         const isKepsek = user.role === "Kepala Sekolah" || user.role === "Kepsek";
+        const isPengawas = user.role === "Pengawas";
+
+        const schools = (typeof DashboardManager !== "undefined" && DashboardManager.cachedData.schools) 
+            ? DashboardManager.cachedData.schools 
+            : [];
 
         let schoolName = "";
         if (isKepsek) {
             schoolName = (user.asal_sekolah || "").trim();
+            if (!schoolName) {
+                this.renderFolderSekolahEmptyState("Data sekolah untuk akun Kepala Sekolah Anda belum dikonfigurasikan.");
+                return;
+            }
         } else {
-            // Pengawas: Ambil sekolah yang tersimpan di localStorage, atau yang sedang aktif, atau sekolah pertama
+            // Pengawas: Periksa apakah ada sekolah binaan yang terdaftar
+            if (!schools || schools.length === 0) {
+                try {
+                    localStorage.removeItem("pantausekolah_folder_sekolah_school");
+                } catch (e) {}
+                this.selectedSchoolFolderSekolah = null;
+                this.renderFolderSekolahEmptyState("Belum ada laporan atau data sekolah binaan yang terdaftar pada sistem.");
+                return;
+            }
+
+            // Validasi savedSchool di localStorage apakah masih ada di daftar schools
             let savedSchool = null;
             try {
                 savedSchool = localStorage.getItem("pantausekolah_folder_sekolah_school");
             } catch (e) {}
-            const schools = (typeof DashboardManager !== "undefined" && DashboardManager.cachedData.schools) 
-                ? DashboardManager.cachedData.schools 
-                : [];
-            schoolName = savedSchool || this.selectedSchoolFolderSekolah || (schools[0] ? schools[0].nama : "SD Karya Bangsa");
+
+            const savedSchoolExists = savedSchool && schools.some(s => (s.nama || "").toLowerCase() === savedSchool.toLowerCase());
+
+            if (savedSchool && savedSchoolExists) {
+                schoolName = savedSchool;
+            } else if (this.selectedSchoolFolderSekolah && schools.some(s => (s.nama || "").toLowerCase() === this.selectedSchoolFolderSekolah.toLowerCase())) {
+                schoolName = this.selectedSchoolFolderSekolah;
+            } else {
+                schoolName = schools[0] ? schools[0].nama : "";
+            }
+
+            if (!schoolName) {
+                try {
+                    localStorage.removeItem("pantausekolah_folder_sekolah_school");
+                } catch (e) {}
+                this.selectedSchoolFolderSekolah = null;
+                this.renderFolderSekolahEmptyState("Belum ada data sekolah binaan yang terdaftar.");
+                return;
+            }
         }
 
         this.selectedSchoolFolderSekolah = schoolName;
@@ -1525,8 +1598,38 @@ const ReportManager = {
 
         const isPengawas = user.role === "Pengawas";
         const isKepsek = user.role === "Kepala Sekolah" || user.role === "Kepsek";
+
+        const schoolsMeta = (typeof DashboardManager !== "undefined" && DashboardManager.cachedData.schools) 
+            ? DashboardManager.cachedData.schools 
+            : [];
+
+        if (isPengawas) {
+            if (!schoolsMeta || schoolsMeta.length === 0) {
+                try {
+                    localStorage.removeItem("pantausekolah_folder_sekolah_school");
+                } catch (e) {}
+                this.selectedSchoolFolderSekolah = null;
+                this.renderFolderSekolahEmptyState("Belum ada laporan atau data sekolah binaan yang terdaftar pada sistem.");
+                return;
+            }
+            const target = (schoolName || this.selectedSchoolFolderSekolah || "").trim();
+            const exists = target && schoolsMeta.some(s => (s.nama || "").toLowerCase() === target.toLowerCase());
+            if (!exists) {
+                schoolName = schoolsMeta[0].nama;
+            }
+        }
+
         const targetSchool = (schoolName || this.selectedSchoolFolderSekolah || (user.asal_sekolah || "")).trim();
-        if (!targetSchool) return;
+        if (!targetSchool) {
+            this.renderFolderSekolahEmptyState("Belum ada data sekolah yang dipilih.");
+            return;
+        }
+
+        // Tampilkan konten dan sembunyikan tampilan kosong
+        const emptyWrapper = document.getElementById("wrapper-folder-sekolah-empty");
+        const contentWrapper = document.getElementById("wrapper-folder-sekolah-content");
+        if (emptyWrapper) emptyWrapper.classList.add("hidden");
+        if (contentWrapper) contentWrapper.classList.remove("hidden");
 
         this.selectedSchoolFolderSekolah = targetSchool;
         this.selectedSchoolState = targetSchool;
@@ -1536,9 +1639,6 @@ const ReportManager = {
         const safeTargetSchool = targetSchool.replace(/'/g, "\\'");
 
         // 1. Ambil URL Drive Utama Sekolah
-        const schoolsMeta = (typeof DashboardManager !== "undefined" && DashboardManager.cachedData.schools) 
-            ? DashboardManager.cachedData.schools 
-            : [];
         const schoolObj = schoolsMeta.find(s => (s.nama || "").toLowerCase() === targetSchool.toLowerCase());
         const schoolDriveUrl = schoolObj ? (schoolObj.driveUrl || schoolObj.driveFolderUrl || "") : (user.asal_sekolah && user.asal_sekolah.toLowerCase() === targetSchool.toLowerCase() ? (user.drive_url || "") : "");
 

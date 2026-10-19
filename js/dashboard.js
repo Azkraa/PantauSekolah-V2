@@ -221,7 +221,7 @@ const DashboardManager = {
                         <div class="min-w-0">
                             <div class="flex items-center gap-2 flex-wrap">
                                 <p class="text-xs font-bold text-slate-800 truncate">${item.nama}</p>
-                                <span class="text-[10px] font-bold px-2 py-0.5 rounded ${roleColor}">${item.asalSekolah || 'SD 04 Pinoh'}</span>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded ${roleColor}">${item.asalSekolah || '-'}</span>
                             </div>
                             <p class="text-[11px] text-slate-500 mt-0.5"><span class="font-semibold text-slate-700">${item.kategori}</span> • ${item.tanggal}</p>
                         </div>
