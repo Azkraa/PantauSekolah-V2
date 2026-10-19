@@ -149,36 +149,24 @@ const DashboardManager = {
     },
 
     /**
-     * Dapatkan daftar seluruh folder laporan aktif yang ada di sistem
+     * Dapatkan daftar seluruh folder laporan aktif yang BENAR-BENAR dibuat pengawas di Google Drive.
+     * Hanya dari LiveSync.state.folders / DriveManager.cachedFolders — tanpa hardcoded defaults.
      */
     getAllAvailableFolders() {
         const folderSet = new Set();
 
-        // 1. Ambil folder dari database Google Drive / LiveSync
-        const customFolders = (typeof LiveSync !== "undefined" && LiveSync.state.folders)
+        // Ambil HANYA dari folder yang benar-benar dibuat pengawas di Drive
+        const customFolders = (typeof LiveSync !== "undefined" && LiveSync.state && LiveSync.state.folders)
             ? LiveSync.state.folders
             : (typeof DriveManager !== "undefined" && DriveManager.cachedFolders ? DriveManager.cachedFolders : []);
 
         customFolders.forEach(f => {
-            if (f && f.namaFolder && !f.namaFolder.startsWith("__DELETED__:") && !String(f.id).startsWith("DEL-")) {
+            if (f && f.namaFolder
+                && !f.namaFolder.startsWith("__DELETED__:")
+                && !String(f.id || "").startsWith("DEL-")) {
                 folderSet.add(f.namaFolder.trim());
             }
         });
-
-        // 2. Ambil dari jenisPelaporan / kategori di laporan yang ada
-        const allReports = [...(this.cachedData.reportsKepsek || []), ...(this.cachedData.reportsGuru || [])];
-        allReports.forEach(r => {
-            if (r.jenisPelaporan && r.jenisPelaporan.trim()) {
-                folderSet.add(r.jenisPelaporan.trim());
-            }
-            if (r.kategori && r.kategori.trim()) {
-                if (r.kategori.length <= 35) folderSet.add(r.kategori.trim());
-            }
-        });
-
-        // 3. Pastikan folder umum utama ada di daftar jika belum ada folder lain
-        const defaults = ["Laporan Bulanan", "Laporan RKAS", "Supervisi KBM", "Laporan Mingguan", "Laporan Daring", "Modul Ajar / RPP"];
-        defaults.forEach(d => folderSet.add(d));
 
         return Array.from(folderSet).sort((a, b) => a.localeCompare(b, 'id'));
     },
@@ -230,6 +218,8 @@ const DashboardManager = {
                 html += `<option value="${f}" ${isSel ? "selected" : ""}>📁 ${f}</option>`;
             });
             html += `</optgroup>`;
+        } else {
+            html += `<option value="" disabled>— Belum ada folder dibuat pengawas —</option>`;
         }
 
         select.innerHTML = html;
@@ -324,6 +314,26 @@ const DashboardManager = {
                 const pct = Math.round((completedCount / totalTarget) * 100);
                 totalCompletedAllSchools += pct;
 
+                // Hitung "Perlu Perhatian" — tentukan alasan
+                const attentionReasons = [];
+                const rejectedCount = sReports.filter(r => r.status === "Ditolak" || r.status === "Perlu Perbaikan").length;
+                const waitingCount  = sReports.filter(r => r.status === "Menunggu Verifikasi" || r.status === "Menunggu").length;
+                const approvedCount = sReports.filter(r => r.status === "Disetujui").length;
+
+                if (sReports.length === 0) {
+                    attentionReasons.push("Belum ada laporan yang diunggah sama sekali");
+                } else {
+                    if (rejectedCount > 0) {
+                        attentionReasons.push(`${rejectedCount} laporan perlu perbaikan / ditolak`);
+                    }
+                    if (missingFolders.length >= Math.ceil(totalTarget / 2) && totalTarget > 0) {
+                        attentionReasons.push(`${missingFolders.length} dari ${totalTarget} folder belum diisi`);
+                    }
+                    if (waitingCount > 0 && approvedCount === 0 && rejectedCount === 0) {
+                        attentionReasons.push("Semua laporan masih menunggu verifikasi");
+                    }
+                }
+
                 labels.push(schoolName);
                 datasetData.push(completedCount);
                 schoolDetails.push({
@@ -332,7 +342,8 @@ const DashboardManager = {
                     totalTarget: totalTarget,
                     percent: pct,
                     missing: missingFolders,
-                    uploaded: uploadedFolders
+                    uploaded: uploadedFolders,
+                    attentionReasons: attentionReasons
                 });
 
                 // Warna progress: hijau (100%), biru (>=60%), amber (>=30%), merah (<30%)
@@ -380,13 +391,30 @@ const DashboardManager = {
                 const count = matching.length;
                 if (count > 0) schoolsUploadedCount++;
 
+                // Hitung alasan perlu perhatian untuk Mode B
+                const attentionReasons = [];
+                if (count === 0) {
+                    attentionReasons.push(`Belum mengunggah berkas untuk folder "${selectedFolder}"`);
+                } else {
+                    const rejectedB = matching.filter(r => r.status === "Ditolak" || r.status === "Perlu Perbaikan").length;
+                    const waitingB  = matching.filter(r => r.status === "Menunggu Verifikasi" || r.status === "Menunggu").length;
+                    const approvedB = matching.filter(r => r.status === "Disetujui").length;
+                    if (rejectedB > 0) {
+                        attentionReasons.push(`${rejectedB} berkas ditolak / perlu perbaikan`);
+                    }
+                    if (waitingB > 0 && approvedB === 0 && rejectedB === 0) {
+                        attentionReasons.push("Semua berkas masih menunggu verifikasi");
+                    }
+                }
+
                 labels.push(schoolName);
                 datasetData.push(count);
                 schoolDetails.push({
                     school: schoolName,
                     count: count,
                     isUploaded: count > 0,
-                    folder: selectedFolder
+                    folder: selectedFolder,
+                    attentionReasons: attentionReasons
                 });
 
                 if (count > 0) {
@@ -518,6 +546,55 @@ const DashboardManager = {
                 }
             }
         });
+
+        // Tampilkan daftar sekolah yang perlu perhatian di bawah grafik
+        this.renderAttentionList(schoolDetails);
+    },
+
+    /**
+     * Render daftar sekolah yang perlu perhatian pengawas di bawah grafik kepatuhan
+     */
+    renderAttentionList(schoolDetails) {
+        const container = document.getElementById("chart-attention-list");
+        if (!container) return;
+
+        const needsAttention = (schoolDetails || []).filter(s => s.attentionReasons && s.attentionReasons.length > 0);
+
+        if (needsAttention.length === 0) {
+            container.className = "hidden mt-3 space-y-1.5 text-xs";
+            container.innerHTML = "";
+            return;
+        }
+
+        container.className = "mt-3 space-y-1.5 text-xs";
+
+        let html = `
+            <div class="flex items-center gap-2 mb-2 pt-2 border-t border-[#F0EBE1]">
+                <span class="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    ${needsAttention.length} Sekolah Perlu Perhatian
+                </span>
+                <span class="text-[10px] text-slate-400 hidden sm:inline">Detail alasan di bawah ini</span>
+            </div>`;
+
+        needsAttention.forEach(s => {
+            html += `
+            <div class="flex flex-col sm:flex-row sm:items-start gap-1.5 sm:gap-3 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                <div class="flex items-center gap-1.5 min-w-[160px] sm:min-w-[180px]">
+                    <i class="fa-solid fa-school text-amber-600 flex-shrink-0 text-[11px]"></i>
+                    <span class="font-bold text-slate-800 text-[11px] leading-tight">${s.school}</span>
+                </div>
+                <ul class="flex flex-col gap-0.5 flex-1">
+                    ${s.attentionReasons.map(r => `
+                        <li class="flex items-start gap-1 text-[11px] text-amber-800">
+                            <i class="fa-solid fa-circle-exclamation text-[9px] mt-0.5 flex-shrink-0 text-amber-500"></i>
+                            <span>${r}</span>
+                        </li>`).join("")}
+                </ul>
+            </div>`;
+        });
+
+        container.innerHTML = html;
     },
 
     /**
