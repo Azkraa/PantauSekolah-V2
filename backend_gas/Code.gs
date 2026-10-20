@@ -1041,7 +1041,7 @@ function handleCreateDriveFolder(data) {
 
   const rowsToAppend = [];
   const startTime = new Date().getTime();
-  const MAX_RUNTIME_MS = 25000; // 25 detik batas aman Apps Script
+  const MAX_RUNTIME_MS = 50000; // 50 detik batas aman Apps Script
 
   for (let sIdx = 0; sIdx < schoolsToProcess.length; sIdx++) {
     const sch = schoolsToProcess[sIdx];
@@ -1089,7 +1089,6 @@ function handleCreateDriveFolder(data) {
           targetParent = sub.next();
         } else {
           targetParent = parentSchoolFolder.createFolder("01_Laporan_Kepsek");
-          targetParent.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
         }
       } else if (subCategory === "guru") {
         const sub = parentSchoolFolder.getFoldersByName("02_Laporan_Guru");
@@ -1097,7 +1096,6 @@ function handleCreateDriveFolder(data) {
           targetParent = sub.next();
         } else {
           targetParent = parentSchoolFolder.createFolder("02_Laporan_Guru");
-          targetParent.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
         }
       }
 
@@ -1108,7 +1106,6 @@ function handleCreateDriveFolder(data) {
         newFolder = existingInDrive.next();
       } else {
         newFolder = targetParent.createFolder(folderName);
-        newFolder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
       }
 
       maxIdNum++;
