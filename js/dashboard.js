@@ -115,9 +115,18 @@ const DashboardManager = {
         let perbaikan = all.filter(x => x.status === "Perlu Perbaikan").length;
         let ditolak = all.filter(x => x.status === "Ditolak").length;
 
-        // Update badge total berkas
+        // Update badge total berkas & mini stats
         const totalBadgeEl = document.getElementById('chart-status-total-badge');
         if (totalBadgeEl) totalBadgeEl.innerText = `Total: ${all.length} Berkas`;
+
+        const pDisetujui = document.getElementById('mini-stat-disetujui');
+        const pMenunggu = document.getElementById('mini-stat-menunggu');
+        const pPerbaikan = document.getElementById('mini-stat-perbaikan');
+        const pDitolak = document.getElementById('mini-stat-ditolak');
+        if (pDisetujui) pDisetujui.innerText = disetujui;
+        if (pMenunggu) pMenunggu.innerText = menunggu;
+        if (pPerbaikan) pPerbaikan.innerText = perbaikan;
+        if (pDitolak) pDitolak.innerText = ditolak;
 
         // 1. Donut Chart Status
         const canvasStatus = document.getElementById('chartStatus');
