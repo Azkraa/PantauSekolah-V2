@@ -25,7 +25,10 @@ const DinasReportManager = {
         selectedSchool: "all",
         catatanTemuan: "",
         rekomendasiDinas: "",
-        calculatedData: null
+        calculatedData: null,
+        geminiApiKey: "",
+        geminiModel: "gemini-2.5-flash",
+        isGeminiLoading: false
     },
 
     /**
@@ -36,6 +39,7 @@ const DinasReportManager = {
         this.populateSchoolFilter();
         this.calculateReportMetrics();
         this.syncFormInputs();
+        this.updateGeminiStatusBadge();
         this.renderPreview();
     },
 
@@ -54,6 +58,10 @@ const DinasReportManager = {
                 const parsed = JSON.parse(saved);
                 Object.assign(this.state, parsed);
             }
+            const savedKey = localStorage.getItem("pantausekolah_gemini_api_key");
+            if (savedKey) this.state.geminiApiKey = savedKey.trim();
+            const savedModel = localStorage.getItem("pantausekolah_gemini_model");
+            if (savedModel) this.state.geminiModel = savedModel.trim();
         } catch (e) {
             console.warn("Gagal membaca preferensi laporan dinas:", e);
         }
@@ -744,6 +752,317 @@ const DinasReportManager = {
 
         if (typeof App !== "undefined" && typeof App.showToast === "function") {
             App.showToast("File CSV Rekapitulasi berhasil diunduh!", "success");
+        }
+    },
+
+    /**
+     * Buka Modal Konfigurasi Google Gemini API
+     */
+    openGeminiConfigModal() {
+        const modal = document.getElementById("modal-gemini-config");
+        if (!modal) return;
+        const inputKey = document.getElementById("input-gemini-key");
+        const selectModel = document.getElementById("select-gemini-model");
+        if (inputKey) inputKey.value = this.state.geminiApiKey || "";
+        if (selectModel) selectModel.value = this.state.geminiModel || "gemini-2.5-flash";
+        modal.classList.remove("hidden");
+    },
+
+    /**
+     * Tutup Modal Konfigurasi Google Gemini API
+     */
+    closeGeminiConfigModal() {
+        const modal = document.getElementById("modal-gemini-config");
+        if (modal) modal.classList.add("hidden");
+    },
+
+    /**
+     * Simpan Konfigurasi Google Gemini API
+     */
+    saveGeminiConfig() {
+        const inputKey = document.getElementById("input-gemini-key");
+        const selectModel = document.getElementById("select-gemini-model");
+        const key = inputKey ? inputKey.value.trim() : "";
+        const model = selectModel ? selectModel.value : "gemini-2.5-flash";
+
+        this.state.geminiApiKey = key;
+        this.state.geminiModel = model;
+
+        try {
+            if (key) {
+                localStorage.setItem("pantausekolah_gemini_api_key", key);
+            } else {
+                localStorage.removeItem("pantausekolah_gemini_api_key");
+            }
+            localStorage.setItem("pantausekolah_gemini_model", model);
+        } catch (e) {}
+
+        this.updateGeminiStatusBadge();
+        this.closeGeminiConfigModal();
+
+        if (typeof App !== "undefined" && typeof App.showToast === "function") {
+            if (key) {
+                App.showToast(`Konfigurasi Google Gemini (${model}) berhasil disimpan!`, "success");
+            } else {
+                App.showToast("API Key Gemini dihapus. Sistem akan menggunakan draf bawaan.", "info");
+            }
+        }
+    },
+
+    /**
+     * Update Status Pill Gemini di Header Laporan Dinas
+     */
+    updateGeminiStatusBadge() {
+        const badgeContainer = document.getElementById("dinas-gemini-status-container");
+        if (!badgeContainer) return;
+
+        const hasKey = Boolean(this.state.geminiApiKey && this.state.geminiApiKey.length > 5);
+        if (hasKey) {
+            badgeContainer.innerHTML = `
+                <button type="button" onclick="DinasReportManager.openGeminiConfigModal()"
+                    title="Klik untuk ubah pengaturan Gemini API"
+                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-bold border border-emerald-400/30 hover:bg-emerald-500/30 transition-all cursor-pointer">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>Gemini AI Aktif (${this.state.geminiModel || '2.5 Flash'})</span>
+                    <i class="fa-solid fa-gear text-[10px] ml-0.5 text-emerald-300/70"></i>
+                </button>
+            `;
+        } else {
+            badgeContainer.innerHTML = `
+                <button type="button" onclick="DinasReportManager.openGeminiConfigModal()"
+                    title="Klik untuk menghubungkan API Key Gemini gratis"
+                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-[11px] font-bold border border-amber-400/30 hover:bg-amber-500/30 transition-all cursor-pointer">
+                    <i class="fa-solid fa-key"></i>
+                    <span>Hubungkan Gemini AI</span>
+                    <i class="fa-solid fa-arrow-right text-[10px] ml-0.5"></i>
+                </button>
+            `;
+        }
+    },
+
+    /**
+     * Uji Koneksi Google Gemini API
+     */
+    async testGeminiConnection() {
+        const inputKey = document.getElementById("input-gemini-key");
+        const selectModel = document.getElementById("select-gemini-model");
+        const key = inputKey ? inputKey.value.trim() : "";
+        const model = selectModel ? selectModel.value : "gemini-2.5-flash";
+
+        if (!key) {
+            if (typeof App !== "undefined" && typeof App.showToast === "function") {
+                App.showToast("Masukkan API Key terlebih dahulu sebelum tes koneksi!", "error");
+            }
+            return;
+        }
+
+        const btnTest = document.getElementById("btn-test-gemini");
+        if (btnTest) {
+            btnTest.disabled = true;
+            btnTest.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menghubungkan...';
+        }
+
+        try {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
+            const resp = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    contents: [{ role: "user", parts: [{ text: "Jawab satu kata: KONEKSI_BERHASIL" }] }]
+                })
+            });
+
+            if (!resp.ok) {
+                const errData = await resp.json().catch(() => ({}));
+                const msg = errData.error ? errData.error.message : `HTTP ${resp.status}`;
+                throw new Error(msg);
+            }
+
+            if (typeof App !== "undefined" && typeof App.showToast === "function") {
+                App.showToast(`Koneksi ke Google Gemini (${model}) BERHASIL! Siap digunakan.`, "success");
+            }
+        } catch (err) {
+            console.error("Test Gemini Error:", err);
+            if (typeof App !== "undefined" && typeof App.showToast === "function") {
+                App.showToast(`Gagal terhubung ke Gemini: ${err.message}`, "error");
+            }
+        } finally {
+            if (btnTest) {
+                btnTest.disabled = false;
+                btnTest.innerHTML = '<i class="fa-solid fa-plug"></i> Test Koneksi';
+            }
+        }
+    },
+
+    /**
+     * Panggil Google Gemini API REST
+     */
+    async callGeminiApi(promptText) {
+        const apiKey = this.state.geminiApiKey;
+        if (!apiKey) throw new Error("API Key belum dikonfigurasi.");
+
+        const preferredModel = this.state.geminiModel || "gemini-2.5-flash";
+        // Fallback models jika salah satu model temporary busy
+        const modelsToTry = [preferredModel];
+        if (preferredModel !== "gemini-2.0-flash") modelsToTry.push("gemini-2.0-flash");
+        if (preferredModel !== "gemini-1.5-flash") modelsToTry.push("gemini-1.5-flash");
+
+        let lastError = null;
+
+        for (const model of modelsToTry) {
+            try {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+                const payload = {
+                    contents: [
+                        {
+                            role: "user",
+                            parts: [{ text: promptText }]
+                        }
+                    ],
+                    generationConfig: {
+                        temperature: 0.35,
+                        topP: 0.95
+                    }
+                };
+
+                const resp = await fetch(url, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!resp.ok) {
+                    const errData = await resp.json().catch(() => ({}));
+                    const errMsg = errData.error ? errData.error.message : `HTTP ${resp.status}`;
+                    throw new Error(errMsg);
+                }
+
+                const data = await resp.json();
+                const candidate = data.candidates && data.candidates[0];
+                if (!candidate || !candidate.content || !candidate.content.parts || !candidate.content.parts[0]) {
+                    throw new Error("Respon dari Gemini kosong.");
+                }
+
+                return candidate.content.parts[0].text;
+            } catch (err) {
+                lastError = err;
+                console.warn(`Percobaan model ${model} gagal:`, err);
+            }
+        }
+
+        throw lastError || new Error("Gagal mendapatkan respon dari Google Gemini.");
+    },
+
+    /**
+     * Generate Temuan & Rekomendasi Resmi Menggunakan Google Gemini AI
+     */
+    async generateWithGemini() {
+        if (!this.state.geminiApiKey) {
+            if (typeof App !== "undefined" && typeof App.showToast === "function") {
+                App.showToast("Harap masukkan Google Gemini API Key terlebih dahulu.", "info");
+            }
+            this.openGeminiConfigModal();
+            return;
+        }
+
+        this.calculateReportMetrics();
+        const data = this.state.calculatedData;
+        if (!data) return;
+
+        const btn = document.getElementById("btn-dinas-gemini");
+        const btnIcon = document.getElementById("dinas-gemini-btn-icon");
+        const btnText = document.getElementById("dinas-gemini-btn-text");
+
+        if (btn) btn.disabled = true;
+        if (btnIcon) btnIcon.className = "fa-solid fa-spinner fa-spin";
+        if (btnText) btnText.innerText = "Gemini Menganalisis...";
+
+        try {
+            // Bangun ringkasan sekolah untuk prompt
+            const schoolSummaries = data.schoolRows.map(s => 
+                `- ${s.namaSekolah}: Masuk ${s.totalBerkas} berkas, Disetujui ${s.disetujui}, Perlu Revisi ${s.perbaikan + s.ditolak}, Kepatuhan ${s.persentase}%, Predikat ${s.predikat}`
+            ).join("\n");
+
+            const prompt = `Anda adalah Pengawas Sekolah Ahli Madya/Utama Kementerian Pendidikan, Kebudayaan, Riset, dan Teknologi di Indonesia.
+Tugas Anda adalah menganalisis data riil hasil supervisi manajerial dan akademik sekolah binaan berikut, lalu menyusun naskah formal laporan evaluasi dan rekomendasi kebijakan untuk disampaikan kepada Kepala Dinas Pendidikan.
+
+DATA PENGAWASAN LAPANGAN:
+- Nomor Surat Laporan: ${this.state.nomorSurat}
+- Periode Pengawasan: ${this.state.periode}
+- Wilayah Rayon: ${this.state.wilayahBinaan}
+- Total Satuan Pendidikan Binaan: ${data.totalSekolah} Sekolah
+- Total Berkas Laporan Diperiksa: ${data.totalBerkas} Dokumen
+- Berkas Memenuhi Standar (Disetujui): ${data.totalDisetujui} Berkas
+- Berkas Perlu Perbaikan / Ditolak: ${data.totalPerbaikan + data.totalDitolak} Berkas
+- Berkas Masih Menunggu Validasi: ${data.totalMenunggu} Berkas
+- Rata-rata Persentase Kepatuhan Binaan: ${data.rataKepatuhan}%
+- Sekolah Berpredikat Sangat Baik (>=85%): ${data.sangatBaikSchools.map(s => s.namaSekolah).join(", ") || "Belum ada"}
+- Sekolah Perlu Pendampingan Khusus (<60%): ${data.perluPembinaanSchools.map(s => `${s.namaSekolah} (${s.persentase}%)`).join(", ") || "Tidak ada (semua aman)"}
+
+Rincian per sekolah:
+${schoolSummaries}
+
+PETUNJUK PENYUSUNAN LAPORAN KEDINASAN:
+Susun naskah laporan dalam 2 bagian:
+1. Temuan Lapangan: Evaluasi manajerial (administrasi RKAS, RKT, rapor pendidikan kepala sekolah), evaluasi akademik (RPP/modul ajar, pelaksanaan KBM, asesmen guru), dan kendala lapangan yang teridentifikasi.
+2. Rekomendasi Tindak Lanjut: Rekomendasi strategis konkret kepada Kepala Dinas Pendidikan (misal: bimtek/pelatihan untuk sekolah di bawah 60%, penghargaan untuk sekolah berkinerja tinggi, penguatan sistem digital).
+
+FORMAT OUTPUT WAJIB JSON VALID (tanpa teks pengantar di luar JSON):
+{
+  "temuan": "Tuliskan seluruh isi temuan evaluasi dengan penomoran yang rapi dan bahasa dinas formal.",
+  "rekomendasi": "Tuliskan seluruh isi rekomendasi kepada Kepala Dinas Pendidikan dengan penomoran yang rapi dan profesional."
+}`;
+
+            const rawAiResponse = await this.callGeminiApi(prompt);
+            
+            // Ekstrak JSON dari respon
+            let parsed = null;
+            try {
+                // Bersihkan kemungkinan markdown codeblock ```json ... ```
+                let cleanJson = rawAiResponse.trim();
+                if (cleanJson.startsWith("```json")) {
+                    cleanJson = cleanJson.replace(/^```json/, "").replace(/```$/, "").trim();
+                } else if (cleanJson.startsWith("```")) {
+                    cleanJson = cleanJson.replace(/^```/, "").replace(/```$/, "").trim();
+                }
+                parsed = JSON.parse(cleanJson);
+            } catch (err) {
+                // Fallback jika bukan strict JSON, pisahkan berdasarkan kata kunci
+                console.warn("Respon bukan JSON murni, parsing semi-manual:", err);
+                parsed = {
+                    temuan: rawAiResponse.slice(0, Math.floor(rawAiResponse.length / 2)).trim(),
+                    rekomendasi: rawAiResponse.slice(Math.floor(rawAiResponse.length / 2)).trim()
+                };
+            }
+
+            if (parsed && (parsed.temuan || parsed.rekomendasi)) {
+                this.state.catatanTemuan = parsed.temuan || "";
+                this.state.rekomendasiDinas = parsed.rekomendasi || "";
+
+                const inputTemuan = document.getElementById("dinas-input-temuan");
+                const inputRekom = document.getElementById("dinas-input-rekomendasi");
+                if (inputTemuan) inputTemuan.value = this.state.catatanTemuan;
+                if (inputRekom) inputRekom.value = this.state.rekomendasiDinas;
+
+                this.renderPreview();
+
+                if (typeof App !== "undefined" && typeof App.showToast === "function") {
+                    App.showToast("Analisis & Rekomendasi resmi berhasil dirumuskan oleh Google Gemini AI!", "success");
+                }
+            } else {
+                throw new Error("Format analisis Gemini tidak dapat dibaca.");
+            }
+        } catch (err) {
+            console.error("Gemini Generation Error:", err);
+            if (typeof App !== "undefined" && typeof App.showToast === "function") {
+                App.showToast(`Gemini AI error: ${err.message}. Beralih ke draf bawaan.`, "error");
+            }
+            // Fallback ke draf lokal jika API gagal
+            this.generateAutoDraft(false);
+        } finally {
+            if (btn) btn.disabled = false;
+            if (btnIcon) btnIcon.className = "fa-solid fa-wand-magic-sparkles";
+            if (btnText) btnText.innerText = "Draf Gemini AI";
         }
     }
 };
