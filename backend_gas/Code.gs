@@ -95,6 +95,9 @@ function doPost(e) {
       case "record_log":
         return handleRecordClientLog(data);
 
+      case "generate_dinas_report_ai":
+        return handleGenerateDinasReportAI(data);
+
       default:
         return jsonResponse({ status: "error", message: "Aksi '" + action + "' tidak dikenali." });
     }
@@ -1616,6 +1619,138 @@ function handleRecordClientLog(data) {
     status: "success",
     message: "Audit log berhasil dicatat."
   });
+}
+
+// =============================================================================
+// FITUR AI: GENERATOR LAPORAN PENGAWAS KE DINAS (MODEL: GPT OSS 120B)
+// =============================================================================
+
+function handleGenerateDinasReportAI(data) {
+  try {
+    const prompt = data.prompt;
+    if (!prompt) {
+      return jsonResponse({
+        status: "error",
+        message: "Prompt data supervisi tidak ditemukan."
+      });
+    }
+
+    // Ambil API Key dari parameter payload atau Script Properties
+    let apiKey = (data.apiKey || "").trim();
+    if (!apiKey) {
+      apiKey = PropertiesService.getScriptProperties().getProperty("AI_API_KEY") ||
+               PropertiesService.getScriptProperties().getProperty("OPENROUTER_API_KEY") || "";
+    }
+
+    // Default endpoint OpenRouter untuk model GPT OSS 120B
+    const apiUrl = (data.apiUrl || PropertiesService.getScriptProperties().getProperty("AI_API_URL") || "https://openrouter.ai/api/v1/chat/completions").trim();
+
+    // Default model: GPT OSS 120B
+    const model = (data.model || PropertiesService.getScriptProperties().getProperty("AI_MODEL") || "openai/gpt-oss-120b:free").trim();
+
+    if (!apiKey) {
+      return jsonResponse({
+        status: "error",
+        message: "API Key untuk GPT OSS 120B belum diatur. Silakan masukkan API Key pada pengaturan AI di aplikasi atau simpan di Script Properties Google Apps Script ('AI_API_KEY'). Kunci gratis dapat dibuat di openrouter.ai/keys."
+      });
+    }
+
+    const systemPrompt = "Anda adalah Pengawas Sekolah Ahli Madya/Utama Kementerian Pendidikan, Kebudayaan, Riset, dan Teknologi di Indonesia. " +
+      "Tugas Anda adalah menganalisis data riil hasil supervisi manajerial dan akademik sekolah binaan, " +
+      "lalu menyusun naskah formal laporan evaluasi dan rekomendasi kebijakan untuk disampaikan kepada Kepala Dinas Pendidikan. " +
+      "Gunakan bahasa dinas formal, lugas, dan terstruktur. " +
+      "Keluarkan respon WAJIB berupa JSON valid murni dengan format: {\"temuan\": \"...\", \"rekomendasi\": \"...\"}";
+
+    const payload = {
+      model: model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: prompt }
+      ],
+      temperature: 0.35,
+      response_format: { type: "json_object" }
+    };
+
+    const options = {
+      method: "post",
+      contentType: "application/json",
+      headers: {
+        "Authorization": "Bearer " + apiKey,
+        "HTTP-Referer": "https://pantausekolah.app",
+        "X-Title": "PantauSekolah - Laporan Pengawas"
+      },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+
+    const response = UrlFetchApp.fetch(apiUrl, options);
+    const respCode = response.getResponseCode();
+    const respText = response.getContentText();
+
+    if (respCode !== 200) {
+      let errMsg = "HTTP " + respCode;
+      try {
+        const errJson = JSON.parse(respText);
+        if (errJson.error && errJson.error.message) {
+          errMsg = errJson.error.message;
+        }
+      } catch (e) {
+        errMsg = respText.slice(0, 300);
+      }
+      return jsonResponse({
+        status: "error",
+        message: "Gagal memanggil model " + model + " (" + errMsg + ")"
+      });
+    }
+
+    const result = JSON.parse(respText);
+    const candidate = result.choices && result.choices[0] && result.choices[0].message;
+    if (!candidate || !candidate.content) {
+      return jsonResponse({
+        status: "error",
+        message: "Respon model GPT OSS 120B kosong."
+      });
+    }
+
+    let contentText = candidate.content.trim();
+    // Bersihkan markdown codeblock jika ada
+    if (contentText.startsWith("```json")) {
+      contentText = contentText.replace(/^```json/, "").replace(/```$/, "").trim();
+    } else if (contentText.startsWith("```")) {
+      contentText = contentText.replace(/^```/, "").replace(/```$/, "").trim();
+    }
+
+    let parsed = null;
+    try {
+      parsed = JSON.parse(contentText);
+    } catch (e) {
+      const half = Math.floor(contentText.length / 2);
+      parsed = {
+        temuan: contentText.slice(0, half).trim(),
+        rekomendasi: contentText.slice(half).trim()
+      };
+    }
+
+    // Catat audit log keberhasilan analisis AI
+    try {
+      const pengawasNama = data.currentUserName || "Pengawas";
+      recordAuditLog(pengawasNama, data.currentUserUsername || "pengawas", "Pengawas", "-", "Analisis AI", "Generate Laporan Dinas via GPT OSS 120B", "Model: " + model);
+    } catch (e) {}
+
+    return jsonResponse({
+      status: "success",
+      temuan: parsed.temuan || "",
+      rekomendasi: parsed.rekomendasi || "",
+      model: model,
+      message: "Laporan dinas berhasil disintesis oleh GPT OSS 120B."
+    });
+
+  } catch (err) {
+    return jsonResponse({
+      status: "error",
+      message: "Kesalahan server saat memproses GPT OSS 120B: " + err.toString()
+    });
+  }
 }
 
 // =============================================================================

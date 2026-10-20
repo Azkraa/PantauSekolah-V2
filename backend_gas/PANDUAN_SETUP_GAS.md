@@ -64,6 +64,21 @@ Jika Anda memperbarui `Code.gs`:
 
 ---
 
+### Fitur AI Laporan Pengawas ke Dinas Pendidikan (Model: GPT OSS 120B)
+Backend [`Code.gs`](file:///c:/xampp/htdocs/Project%20Pengawas/backend_gas/Code.gs) telah terhubung langsung dengan model **GPT OSS 120B** (open-weight reasoning model) untuk menghasilkan draf evaluasi supervisi manajerial/akademik dan rekomendasi tindak lanjut ke Kepala Dinas Pendidikan.
+
+**Cara Pengaturan Kunci API di Google Apps Script (Opsional tapi Direkomendasikan):**
+1. Di editor Google Apps Script, klik menu ⚙️ **Project Settings** (ikon roda gigi di menu samping kiri).
+2. Gulir ke bawah ke bagian **Script Properties**.
+3. Klik **Add script property**.
+4. Masukkan:
+   - **Property**: `AI_API_KEY`
+   - **Value**: Masukkan API Key Anda (misal dari [OpenRouter](https://openrouter.ai/keys) atau provider OpenAI-compatible).
+5. Klik **Save script properties**.
+*(Catatan: Pengawas juga dapat memasukkan API Key langsung melalui modal pengaturan AI di tampilan web aplikasi PantauSekolah).*
+
+---
+
 ### Akun Awal Bawaan (Default Admin)
 Saat backend pertama kali dijalankan, sistem otomatis membuat akun default Pengawas:
 * **Username**: `admin`
