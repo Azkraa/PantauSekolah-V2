@@ -1630,10 +1630,10 @@ function handleRecordClientLog(data) {
  * untuk memicu dialog izin akses UrlFetchApp (https://www.googleapis.com/auth/script.external_request).
  */
 function authorizeUrlFetch() {
-  const test = UrlFetchApp.fetch("https://openrouter.ai/api/v1/models", {
+  const test = UrlFetchApp.fetch("https://httpbin.org/get", {
     muteHttpExceptions: true
   });
-  Logger.log("Izin UrlFetchApp berhasil diaktifkan! Status Code: " + test.getResponseCode());
+  Logger.log("Izin UrlFetchApp berhasil diaktifkan! Status: " + test.getResponseCode());
 }
 
 function handleGenerateDinasReportAI(data) {
@@ -1657,7 +1657,8 @@ function handleGenerateDinasReportAI(data) {
     const apiUrl = (data.apiUrl || PropertiesService.getScriptProperties().getProperty("AI_API_URL") || "https://openrouter.ai/api/v1/chat/completions").trim();
 
     // Default model: GPT OSS 120B
-    const model = (data.model || PropertiesService.getScriptProperties().getProperty("AI_MODEL") || "openai/gpt-oss-120b:free").trim();
+    let model = (data.model || PropertiesService.getScriptProperties().getProperty("AI_MODEL") || "openai/gpt-oss-120b").trim();
+    if (model.includes(":free")) model = "openai/gpt-oss-120b";
 
     if (!apiKey) {
       return jsonResponse({

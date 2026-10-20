@@ -27,7 +27,7 @@ const DinasReportManager = {
         rekomendasiDinas: "",
         calculatedData: null,
         aiApiKey: "",
-        aiModel: "openai/gpt-oss-120b:free",
+        aiModel: "openai/gpt-oss-120b",
         isAiLoading: false
     },
 
@@ -61,8 +61,8 @@ const DinasReportManager = {
             const savedKey = localStorage.getItem("pantausekolah_ai_api_key");
             if (savedKey) this.state.aiApiKey = savedKey.trim();
             const savedModel = localStorage.getItem("pantausekolah_ai_model");
-            if (savedModel) this.state.aiModel = savedModel.trim();
-            else this.state.aiModel = "openai/gpt-oss-120b:free";
+            if (savedModel && !savedModel.includes(":free")) this.state.aiModel = savedModel.trim();
+            else this.state.aiModel = "openai/gpt-oss-120b";
         } catch (e) {
             console.warn("Gagal membaca preferensi laporan dinas:", e);
         }
@@ -765,7 +765,7 @@ const DinasReportManager = {
         const inputKey = document.getElementById("input-ai-key");
         const selectModel = document.getElementById("select-ai-model");
         if (inputKey) inputKey.value = this.state.aiApiKey || "";
-        if (selectModel) selectModel.value = this.state.aiModel || "openai/gpt-oss-120b:free";
+        if (selectModel) selectModel.value = this.state.aiModel || "openai/gpt-oss-120b";
         modal.classList.remove("hidden");
     },
 
@@ -784,7 +784,7 @@ const DinasReportManager = {
         const inputKey = document.getElementById("input-ai-key");
         const selectModel = document.getElementById("select-ai-model");
         const key = inputKey ? inputKey.value.trim() : "";
-        const model = selectModel ? selectModel.value : "openai/gpt-oss-120b:free";
+        const model = selectModel ? selectModel.value : "openai/gpt-oss-120b";
 
         this.state.aiApiKey = key;
         this.state.aiModel = model;
@@ -915,8 +915,8 @@ const DinasReportManager = {
     async testAiConnection() {
         const inputKey = document.getElementById("input-ai-key");
         const selectModel = document.getElementById("select-ai-model");
-        const key = inputKey ? inputKey.value.trim() : "";
-        const model = selectModel ? selectModel.value : "openai/gpt-oss-120b:free";
+        const key = inputKey ? inputKey.value.trim() : (this.state.aiApiKey || "");
+        const model = selectModel ? selectModel.value : "openai/gpt-oss-120b";
 
         if (!key) {
             if (typeof App !== "undefined" && typeof App.showToast === "function") {
