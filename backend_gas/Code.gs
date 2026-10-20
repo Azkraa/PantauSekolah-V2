@@ -270,6 +270,80 @@ function getOrCreateRootFolder() {
 }
 
 /**
+ * Membersihkan duplikasi baris nama sekolah pada sheet Sekolah (Self-Healing)
+ */
+function cleanDuplicateSchoolRows(ss) {
+  if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheetSekolah = ss.getSheetByName(SHEET_SEKOLAH);
+  if (!sheetSekolah) return;
+
+  const data = sheetSekolah.getDataRange().getValues();
+  if (data.length <= 2) return;
+
+  const seen = {};
+  const rowsToDelete = [];
+
+  for (let i = 1; i < data.length; i++) {
+    const sName = data[i][1] ? data[i][1].toString().trim() : "";
+    if (!sName) continue;
+    const lower = sName.toLowerCase();
+    const folderId = data[i][2] ? data[i][2].toString().trim() : "";
+
+    if (seen[lower]) {
+      const prev = seen[lower];
+      // Jika baris sebelumnya kosong folderId tapi baris ini punya, salin folderId ke baris sebelumnya
+      if (!prev.hasFolder && folderId) {
+        sheetSekolah.getRange(prev.row, 3, 1, 2).setValues([[folderId, data[i][3] || ""]]);
+        prev.hasFolder = true;
+      }
+      rowsToDelete.push(i + 1);
+    } else {
+      seen[lower] = { row: i + 1, hasFolder: !!folderId };
+    }
+  }
+
+  // Hapus dari indeks terbesar ke terkecil
+  for (let r = rowsToDelete.length - 1; r >= 0; r--) {
+    sheetSekolah.deleteRow(rowsToDelete[r]);
+  }
+}
+
+/**
+ * Membersihkan folder duplikat di sheet Folder_Drive (Self-Healing)
+ */
+function cleanDuplicateFolderDriveRows(ss) {
+  if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheetFolder = ss.getSheetByName(SHEET_FOLDER_DRIVE);
+  if (!sheetFolder) return;
+
+  const data = sheetFolder.getDataRange().getValues();
+  if (data.length <= 2) return;
+
+  const seen = {};
+  const rowsToDelete = [];
+
+  for (let i = 1; i < data.length; i++) {
+    const fId = data[i][0] ? data[i][0].toString().trim() : "";
+    const fName = data[i][1] ? data[i][1].toString().trim() : "";
+    const sName = data[i][2] ? data[i][2].toString().trim() : "";
+    const subCat = (data[i][7] || "guru").toString().trim().toLowerCase();
+
+    if (!fName || fName.startsWith("__DELETED__:") || fId.startsWith("DEL-")) continue;
+
+    const key = fName.toLowerCase() + "|||" + sName.toLowerCase() + "|||" + subCat;
+    if (seen[key]) {
+      rowsToDelete.push(i + 1);
+    } else {
+      seen[key] = i + 1;
+    }
+  }
+
+  for (let r = rowsToDelete.length - 1; r >= 0; r--) {
+    sheetFolder.deleteRow(rowsToDelete[r]);
+  }
+}
+
+/**
  * Mendapatkan atau membuat folder sekolah di Google Drive
  */
 function getOrCreateSchoolFolder(schoolName) {
@@ -278,19 +352,25 @@ function getOrCreateSchoolFolder(schoolName) {
   const sheetSekolah = ss.getSheetByName(SHEET_SEKOLAH);
   const data = sheetSekolah.getDataRange().getValues();
 
+  let existingRowIndex = -1;
+
   // Cari di database apakah sudah ada
   for (let i = 1; i < data.length; i++) {
-    if (data[i][1] && data[i][1].toString().toLowerCase() === cleanSchool.toLowerCase()) {
-      try {
-        const folder = DriveApp.getFolderById(data[i][2]);
-        return { folder: folder, id: data[i][2], url: data[i][3] };
-      } catch (e) {
-        // Jika folder terhapus dari drive, lanjutkan buat baru di bawah
+    if (data[i][1] && data[i][1].toString().trim().toLowerCase() === cleanSchool.toLowerCase()) {
+      existingRowIndex = i + 1;
+      if (data[i][2]) {
+        try {
+          const folder = DriveApp.getFolderById(data[i][2]);
+          return { folder: folder, id: data[i][2], url: data[i][3] };
+        } catch (e) {
+          // Folder di drive terhapus/tidak valid, buat baru dan perbarui baris yang ada
+        }
       }
+      break;
     }
   }
 
-  // Jika belum ada, buat di dalam Root Folder
+  // Jika belum ada di Drive atau perlu dibuat ulang
   const rootFolder = getOrCreateRootFolder();
   const folderName = "[" + cleanSchool + "] - Arsip PantauSekolah";
   const schoolFolder = rootFolder.createFolder(folderName);
@@ -302,11 +382,17 @@ function getOrCreateSchoolFolder(schoolName) {
   fKepsek.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   fGuru.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
-  // Catat ke sheet Sekolah
-  const newId = "SCH-" + ("000" + (sheetSekolah.getLastRow())).slice(-3);
   const folderId = schoolFolder.getId();
   const folderUrl = schoolFolder.getUrl();
-  sheetSekolah.appendRow([newId, cleanSchool, folderId, folderUrl, new Date()]);
+
+  if (existingRowIndex > 0) {
+    // Perbarui baris yang sudah ada, JANGAN menambah baris duplikat!
+    sheetSekolah.getRange(existingRowIndex, 3, 1, 2).setValues([[folderId, folderUrl]]);
+  } else {
+    // Catat baris baru ke sheet Sekolah
+    const newId = "SCH-" + ("000" + (sheetSekolah.getLastRow())).slice(-3);
+    sheetSekolah.appendRow([newId, cleanSchool, folderId, folderUrl, new Date()]);
+  }
 
   return { folder: schoolFolder, id: folderId, url: folderUrl };
 }
@@ -765,6 +851,10 @@ function handleResetPassword(data) {
  */
 function getOrRegisterAllSchools(ss) {
   if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Self-healing: bersihkan baris duplikasi nama sekolah di spreadsheet
+  cleanDuplicateSchoolRows(ss);
+
   const sheetSekolah = ss.getSheetByName(SHEET_SEKOLAH);
   const sheetUsers = ss.getSheetByName(SHEET_USERS);
   const sheetKepsek = ss.getSheetByName(SHEET_LAPORAN_KEPSEK);
@@ -871,38 +961,48 @@ function handleCreateDriveFolder(data) {
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  // Self-heal duplikasi sekolah dan folder drive sebelum proses pembuatan
+  cleanDuplicateSchoolRows(ss);
+  cleanDuplicateFolderDriveRows(ss);
+
   const sheetSekolah = ss.getSheetByName(SHEET_SEKOLAH);
   const sheetFolderDrive = ss.getSheetByName(SHEET_FOLDER_DRIVE);
-  const schoolRows = sheetSekolah.getDataRange().getValues();
+
+  // Ambil daftar sekolah unik yang sudah ternormalisasi & terdaftar
+  const allRegisteredSchools = getOrRegisterAllSchools(ss);
 
   let schoolsToProcess = [];
+  const processedNames = {};
 
   if (targetType === "all") {
-    for (let i = 1; i < schoolRows.length; i++) {
-      if (schoolRows[i][1]) {
+    allRegisteredSchools.forEach(function (sch) {
+      const sName = (sch.nama || "").trim();
+      const lower = sName.toLowerCase();
+      if (sName && lower !== "dinas pendidikan" && lower !== "dinas" && !processedNames[lower]) {
+        processedNames[lower] = true;
         schoolsToProcess.push({
-          nama: schoolRows[i][1],
-          folderId: schoolRows[i][2]
+          nama: sName,
+          folderId: sch.driveFolderId || ""
         });
       }
-    }
+    });
+
     if (schoolsToProcess.length === 0) {
       return jsonResponse({ status: "error", message: "Belum ada sekolah yang terdaftar di sistem." });
     }
   } else {
     // Single school
-    let found = false;
-    for (let i = 1; i < schoolRows.length; i++) {
-      if (schoolRows[i][1] && schoolRows[i][1].toString().toLowerCase() === targetSchool.toLowerCase()) {
-        schoolsToProcess.push({
-          nama: schoolRows[i][1],
-          folderId: schoolRows[i][2]
-        });
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
+    const lowerTarget = targetSchool.toLowerCase();
+    const foundSchool = allRegisteredSchools.find(function (s) {
+      return (s.nama || "").trim().toLowerCase() === lowerTarget;
+    });
+
+    if (foundSchool) {
+      schoolsToProcess.push({
+        nama: foundSchool.nama,
+        folderId: foundSchool.driveFolderId || ""
+      });
+    } else {
       const newSch = getOrCreateSchoolFolder(targetSchool);
       schoolsToProcess.push({ nama: targetSchool, folderId: newSch.id });
     }
@@ -910,39 +1010,79 @@ function handleCreateDriveFolder(data) {
 
   let createdList = [];
 
-  // Hitung ID awal dari database agar setiap baris sekolah memiliki ID unik
-  let maxIdNum = 0;
+  // Baca sheetFolderDrive sekali saja di awal untuk lookup cepat & hitung max ID
   const existingFolderRows = sheetFolderDrive.getDataRange().getValues();
+  let maxIdNum = 0;
+  const existingFolderMap = {}; // key: lower(folderName) + "|||" + lower(schoolName) + "|||" + lower(subCategory)
+
   for (let i = 1; i < existingFolderRows.length; i++) {
     const idVal = existingFolderRows[i][0] ? existingFolderRows[i][0].toString() : "";
+    const rowFldName = existingFolderRows[i][1] ? existingFolderRows[i][1].toString().trim() : "";
+    const rowSchool = existingFolderRows[i][2] ? existingFolderRows[i][2].toString().trim() : "";
+    const rowSub = (existingFolderRows[i][7] || "guru").toString().trim().toLowerCase();
+
     const m = idVal.match(/FLD-(\d+)/);
     if (m) {
       const num = parseInt(m[1], 10);
       if (num > maxIdNum) maxIdNum = num;
+    }
+
+    if (rowFldName && !rowFldName.startsWith("__DELETED__:") && !idVal.startsWith("DEL-")) {
+      const key = rowFldName.toLowerCase() + "|||" + rowSchool.toLowerCase() + "|||" + rowSub;
+      existingFolderMap[key] = {
+        id: idVal,
+        url: existingFolderRows[i][5] || ""
+      };
     }
   }
   if (maxIdNum < existingFolderRows.length - 1) {
     maxIdNum = existingFolderRows.length - 1;
   }
 
-  schoolsToProcess.forEach(function (sch) {
+  const rowsToAppend = [];
+  const startTime = new Date().getTime();
+  const MAX_RUNTIME_MS = 25000; // 25 detik batas aman Apps Script
+
+  for (let sIdx = 0; sIdx < schoolsToProcess.length; sIdx++) {
+    const sch = schoolsToProcess[sIdx];
+
+    // Safety check batas waktu eksekusi agar tidak timeout fatal
+    if (new Date().getTime() - startTime > MAX_RUNTIME_MS) {
+      break;
+    }
+
     try {
-      // Jika sebelumnya folder default ini dihapus dan sekarang dibuat kembali, bersihkan marker penghapusan
-      const existingRows = sheetFolderDrive.getDataRange().getValues();
-      for (let r = existingRows.length - 1; r >= 1; r--) {
-        const rowFldName = existingRows[r][1] ? existingRows[r][1].toString() : "";
-        const rowSchool = existingRows[r][2] ? existingRows[r][2].toString() : "";
-        if (rowFldName.startsWith("__DELETED__:") && rowSchool.toLowerCase() === sch.nama.toLowerCase()) {
-          const type = rowFldName.replace("__DELETED__:", "").toLowerCase();
-          if (folderName.toLowerCase().includes(type)) {
-            sheetFolderDrive.deleteRow(r + 1);
-          }
-        }
+      const folderKey = folderName.toLowerCase() + "|||" + sch.nama.toLowerCase() + "|||" + subCategory.toLowerCase();
+
+      // Cek apakah folder ini sudah pernah dibuat sebelumnya untuk sekolah ini
+      if (existingFolderMap[folderKey]) {
+        createdList.push({
+          id: existingFolderMap[folderKey].id,
+          sekolah: sch.nama,
+          folderName: folderName,
+          url: existingFolderMap[folderKey].url,
+          subCategory: subCategory,
+          alreadyExisted: true
+        });
+        continue;
       }
 
-      const parentSchoolFolder = DriveApp.getFolderById(sch.folderId);
-      let targetParent = parentSchoolFolder;
+      // Pastikan parent school folder valid
+      let parentSchoolFolder = null;
+      if (sch.folderId) {
+        try {
+          parentSchoolFolder = DriveApp.getFolderById(sch.folderId);
+        } catch (eErr) {
+          parentSchoolFolder = null;
+        }
+      }
+      if (!parentSchoolFolder) {
+        const repaired = getOrCreateSchoolFolder(sch.nama);
+        sch.folderId = repaired.id;
+        parentSchoolFolder = repaired.folder;
+      }
 
+      let targetParent = parentSchoolFolder;
       if (subCategory === "kepsek") {
         const sub = parentSchoolFolder.getFoldersByName("01_Laporan_Kepsek");
         if (sub.hasNext()) {
@@ -961,26 +1101,44 @@ function handleCreateDriveFolder(data) {
         }
       }
 
-      const newFolder = targetParent.createFolder(folderName);
-      newFolder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      // Cari apakah folder dengan nama yang sama sudah ada di dalam targetParent Drive
+      let newFolder = null;
+      const existingInDrive = targetParent.getFoldersByName(folderName);
+      if (existingInDrive.hasNext()) {
+        newFolder = existingInDrive.next();
+      } else {
+        newFolder = targetParent.createFolder(folderName);
+        newFolder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      }
 
       maxIdNum++;
       const newId = "FLD-" + ("000" + maxIdNum).slice(-3);
-      sheetFolderDrive.appendRow([
-        newId, folderName, sch.nama, targetType, newFolder.getId(), newFolder.getUrl(), new Date(), subCategory
+      const newUrl = newFolder.getUrl();
+
+      rowsToAppend.push([
+        newId, folderName, sch.nama, targetType, newFolder.getId(), newUrl, new Date(), subCategory
       ]);
+
+      existingFolderMap[folderKey] = { id: newId, url: newUrl };
 
       createdList.push({
         id: newId,
         sekolah: sch.nama,
         folderName: folderName,
-        url: newFolder.getUrl(),
+        url: newUrl,
         subCategory: subCategory
       });
     } catch (e) {
-      // Lanjutkan jika ada folder yang error
+      // Abaikan error pada satu sekolah dan lanjutkan sekolah berikutnya
     }
-  });
+  }
+
+  // Tulis baris baru ke sheet
+  if (rowsToAppend.length > 0) {
+    rowsToAppend.forEach(function (r) {
+      sheetFolderDrive.appendRow(r);
+    });
+  }
 
   if (createdList.length > 0) {
     recordAuditLog(
@@ -996,7 +1154,7 @@ function handleCreateDriveFolder(data) {
 
   return jsonResponse({
     status: "success",
-    message: "Berhasil membuat folder '" + folderName + "' pada " + createdList.length + " sekolah.",
+    message: "Berhasil memproses folder '" + folderName + "' untuk " + createdList.length + " sekolah.",
     results: createdList
   });
 }
@@ -1007,10 +1165,21 @@ function handleGetDriveFolders(data) {
   const rows = sheetFolder.getDataRange().getValues();
 
   let folders = [];
+  const seenKeys = {};
+
   for (let i = 1; i < rows.length; i++) {
-    const fId = rows[i][0] ? rows[i][0].toString() : "";
-    const fName = rows[i][1] ? rows[i][1].toString() : "";
+    const fId = rows[i][0] ? rows[i][0].toString().trim() : "";
+    const fName = rows[i][1] ? rows[i][1].toString().trim() : "";
+    const fSchool = rows[i][2] ? rows[i][2].toString().trim() : "";
+    const fSub = (rows[i][7] || "guru").toString().trim().toLowerCase();
+
     if (!fName || fName.startsWith("__DELETED__:") || fId.startsWith("DEL-")) continue;
+
+    // Deduplikasi tampilan folder jika ada data duplikat di spreadsheet
+    const key = fName.toLowerCase() + "|||" + fSchool.toLowerCase() + "|||" + fSub;
+    if (seenKeys[key]) continue;
+    seenKeys[key] = true;
+
     folders.push({
       id: rows[i][0],
       namaFolder: rows[i][1],
@@ -1244,8 +1413,19 @@ function handleGetDashboardData(data) {
   const sheetFolder = ss.getSheetByName(SHEET_FOLDER_DRIVE);
   const rawFolder = sheetFolder ? sheetFolder.getDataRange().getValues() : [];
   let foldersList = [];
+  const seenDashFolderKeys = {};
   for (let i = 1; i < rawFolder.length; i++) {
     const r = rawFolder[i];
+    const fId = r[0] ? r[0].toString() : "";
+    const fName = r[1] ? r[1].toString().trim() : "";
+    const fSchool = r[2] ? r[2].toString().trim() : "";
+    const fSub = (r[7] || "guru").toString().trim().toLowerCase();
+    if (!fName || fName.startsWith("__DELETED__:") || fId.startsWith("DEL-")) continue;
+
+    const key = fName.toLowerCase() + "|||" + fSchool.toLowerCase() + "|||" + fSub;
+    if (seenDashFolderKeys[key]) continue;
+    seenDashFolderKeys[key] = true;
+
     if (r[0]) {
       foldersList.push({
         id: r[0],
@@ -1362,11 +1542,19 @@ function handleSyncAll(data) {
   }
 
   let foldersList = [];
+  const seenSyncFolderKeys = {};
   for (let i = 1; i < rawFolder.length; i++) {
     const r = rawFolder[i];
     const fId = r[0] ? r[0].toString() : "";
-    const fName = r[1] ? r[1].toString() : "";
+    const fName = r[1] ? r[1].toString().trim() : "";
+    const fSchool = r[2] ? r[2].toString().trim() : "";
+    const fSub = (r[7] || "guru").toString().trim().toLowerCase();
     if (!fName || fName.startsWith("__DELETED__:") || fId.startsWith("DEL-")) continue;
+
+    const key = fName.toLowerCase() + "|||" + fSchool.toLowerCase() + "|||" + fSub;
+    if (seenSyncFolderKeys[key]) continue;
+    seenSyncFolderKeys[key] = true;
+
     if (r[0]) {
       foldersList.push({
         id: r[0],

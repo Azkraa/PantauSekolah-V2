@@ -96,11 +96,21 @@ const DriveManager = {
         const tbody = document.getElementById("table-body-custom-folders");
         if (!tbody) return;
 
-        const visibleFolders = (this.cachedFolders || []).filter(f => 
-            f.namaFolder && 
-            !f.namaFolder.startsWith("__DELETED__:") && 
-            !(f.id && f.id.toString().startsWith("DEL-"))
-        );
+        // Deduplikasi folder jika ada duplikasi ID atau nama+sekolah+subkategori
+        const seenFolderKeys = new Set();
+        const visibleFolders = (this.cachedFolders || []).filter(f => {
+            if (!f || !f.namaFolder) return false;
+            if (f.namaFolder.startsWith("__DELETED__:") || (f.id && f.id.toString().startsWith("DEL-"))) return false;
+
+            const fName = (f.namaFolder || "").trim().toLowerCase();
+            const sName = (f.namaSekolah || "").trim().toLowerCase();
+            const sub = (f.subCategory || "guru").trim().toLowerCase();
+            const key = `${fName}|||${sName}|||${sub}`;
+
+            if (seenFolderKeys.has(key)) return false;
+            seenFolderKeys.add(key);
+            return true;
+        });
 
         if (visibleFolders.length === 0) {
             tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-slate-400 font-medium">Belum ada folder tambahan yang dibuat.</td></tr>`;
@@ -309,10 +319,13 @@ const DriveManager = {
         // Langsung tutup modal formulir seketika (Auto Close) tanpa modal konfirmasi ganda
         this.closeAddFolderModal();
 
-        const targetLabel = targetType === "all" ? "seluruh sekolah binaan" : targetSchool;
-        App.showToast(`Sedang membuat folder "${folderName}" untuk ${targetLabel}...`, "info");
+        const isBatch = targetType === "all";
+        const targetLabel = isBatch ? "seluruh sekolah binaan" : targetSchool;
+        App.showToast(`Sedang membuat folder "${folderName}" untuk ${targetLabel}... ${isBatch ? 'Proses ini memerlukan waktu beberapa detik, mohon tunggu...' : ''}`, "info");
 
         try {
+            // Gunakan timeout khusus 120 detik untuk batch all schools agar tidak terkena abort timeout
+            const timeoutMs = isBatch ? (CONFIG.UPLOAD_TIMEOUT_MS || 120000) : undefined;
             const res = await ApiService.post({
                 action: "create_drive_folder",
                 currentUserRole: currentUser.role,
@@ -320,7 +333,7 @@ const DriveManager = {
                 targetType: targetType,
                 targetSchool: targetSchool,
                 subCategory: subCategory
-            });
+            }, timeoutMs);
 
             if (res.status === "success") {
                 App.showToast(res.message || `Folder "${folderName}" berhasil dibuat di Google Drive!`, "success");
@@ -329,7 +342,11 @@ const DriveManager = {
                 App.showToast(res.message || "Gagal membuat folder Google Drive.", "error");
             }
         } catch (err) {
-            App.showToast("Terjadi kesalahan saat membuat folder Google Drive.", "error");
+            console.error("Error creating Drive folder:", err);
+            const errMsg = (err && err.message) ? err.message : "Terjadi kesalahan saat membuat folder Google Drive.";
+            App.showToast(errMsg, "error");
+            // Muat ulang data folder yang sempat tersimpan
+            await this.loadDriveData();
         }
     }
 };
