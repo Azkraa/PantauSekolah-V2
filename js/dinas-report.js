@@ -844,6 +844,126 @@ const DinasReportManager = {
     /**
      * Generate Temuan & Rekomendasi Resmi Menggunakan GPT OSS 120B via backend Code.gs
      */
+    /**
+     * Panggil OpenRouter API secara langsung dari browser client (CORS didukung resmi)
+     */
+    async callOpenRouterDirect(promptText, apiKey, model) {
+        const url = "https://openrouter.ai/api/v1/chat/completions";
+        const systemPrompt = "Anda adalah Pengawas Sekolah Ahli Madya/Utama Kementerian Pendidikan, Kebudayaan, Riset, dan Teknologi di Indonesia. " +
+            "Tugas Anda adalah menganalisis data riil hasil supervisi manajerial dan akademik sekolah binaan, " +
+            "lalu menyusun naskah formal laporan evaluasi dan rekomendasi kebijakan untuk disampaikan kepada Kepala Dinas Pendidikan. " +
+            "Gunakan bahasa dinas formal, lugas, dan terstruktur. " +
+            "Keluarkan respon WAJIB berupa JSON valid murni dengan format: {\"temuan\": \"...\", \"rekomendasi\": \"...\"}";
+
+        const payload = {
+            model: model || "openai/gpt-oss-120b:free",
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: promptText }
+            ],
+            temperature: 0.35,
+            response_format: { type: "json_object" }
+        };
+
+        const resp = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + apiKey,
+                "HTTP-Referer": window.location.origin || "https://pantausekolah.app",
+                "X-Title": "PantauSekolah - Laporan Pengawas"
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!resp.ok) {
+            const errJson = await resp.json().catch(() => ({}));
+            const msg = errJson.error ? errJson.error.message : `HTTP ${resp.status}`;
+            throw new Error(msg);
+        }
+
+        const data = await resp.json();
+        const candidate = data.choices && data.choices[0] && data.choices[0].message;
+        if (!candidate || !candidate.content) {
+            throw new Error("Respon dari GPT OSS 120B kosong.");
+        }
+
+        let contentText = candidate.content.trim();
+        if (contentText.startsWith("```json")) {
+            contentText = contentText.replace(/^```json/, "").replace(/```$/, "").trim();
+        } else if (contentText.startsWith("```")) {
+            contentText = contentText.replace(/^```/, "").replace(/```$/, "").trim();
+        }
+
+        let parsed = null;
+        try {
+            parsed = JSON.parse(contentText);
+        } catch (e) {
+            const half = Math.floor(contentText.length / 2);
+            parsed = {
+                temuan: contentText.slice(0, half).trim(),
+                rekomendasi: contentText.slice(half).trim()
+            };
+        }
+
+        return parsed;
+    },
+
+    /**
+     * Uji Koneksi API GPT OSS 120B
+     */
+    async testAiConnection() {
+        const inputKey = document.getElementById("input-ai-key");
+        const selectModel = document.getElementById("select-ai-model");
+        const key = inputKey ? inputKey.value.trim() : "";
+        const model = selectModel ? selectModel.value : "openai/gpt-oss-120b:free";
+
+        if (!key) {
+            if (typeof App !== "undefined" && typeof App.showToast === "function") {
+                App.showToast("Masukkan API Key terlebih dahulu sebelum tes koneksi!", "error");
+            }
+            return;
+        }
+
+        const btnTest = document.getElementById("btn-test-ai");
+        if (btnTest) {
+            btnTest.disabled = true;
+            btnTest.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menguji...';
+        }
+
+        try {
+            let ok = false;
+            // 1. Coba lewat backend Code.gs
+            try {
+                const res = await ApiService.post({
+                    action: "generate_dinas_report_ai",
+                    prompt: "Tes koneksi. Jawab: OK",
+                    apiKey: key,
+                    model: model
+                }, 20000);
+                if (res && res.status === "success") ok = true;
+            } catch (eGas) {}
+
+            // 2. Jika backend Code.gs belum izin UrlFetchApp, uji lewat direct fetch
+            if (!ok) {
+                await this.callOpenRouterDirect("Tes koneksi. Jawab: OK", key, model);
+            }
+
+            if (typeof App !== "undefined" && typeof App.showToast === "function") {
+                App.showToast(`Koneksi ke GPT OSS 120B (${model}) BERHASIL! Siap digunakan.`, "success");
+            }
+        } catch (err) {
+            if (typeof App !== "undefined" && typeof App.showToast === "function") {
+                App.showToast(`Gagal terhubung: ${err.message}`, "error");
+            }
+        } finally {
+            if (btnTest) {
+                btnTest.disabled = false;
+                btnTest.innerHTML = '<i class="fa-solid fa-plug"></i> Test Koneksi';
+            }
+        }
+    },
+
     async generateWithAI() {
         this.calculateReportMetrics();
         const data = this.state.calculatedData;
@@ -887,13 +1007,50 @@ PETUNJUK ANALISIS & PENYUSUNAN LAPORAN:
                 throw new Error("Layanan ApiService tidak tersedia.");
             }
 
-            // Panggil action generate_dinas_report_ai langsung di backend Code.gs
-            const response = await ApiService.post({
-                action: "generate_dinas_report_ai",
-                prompt: prompt,
-                apiKey: this.state.aiApiKey || "",
-                model: this.state.aiModel || "openai/gpt-oss-120b:free"
-            }, 75000); // Batas waktu 75 detik untuk inferensi model 120B
+            let response = null;
+            let sourceInfo = "Code.gs";
+
+            // Percobaan 1: Panggil melalui backend Code.gs
+            try {
+                const gasRes = await ApiService.post({
+                    action: "generate_dinas_report_ai",
+                    prompt: prompt,
+                    apiKey: this.state.aiApiKey || "",
+                    model: this.state.aiModel || "openai/gpt-oss-120b:free"
+                }, 75000);
+
+                if (gasRes && gasRes.status === "success") {
+                    response = gasRes;
+                    sourceInfo = "Backend Code.gs";
+                } else if (gasRes && gasRes.message && (gasRes.message.includes("UrlFetchApp") || gasRes.message.includes("izin"))) {
+                    console.warn("Backend Code.gs belum diotorisasi UrlFetchApp, beralih ke koneksi langsung browser:", gasRes.message);
+                } else if (gasRes && gasRes.message) {
+                    throw new Error(gasRes.message);
+                }
+            } catch (errGas) {
+                console.warn("GAS call error, mencoba direct client fallback:", errGas);
+                // Jika errornya bukan timeout atau network offline, coba direct
+            }
+
+            // Percobaan 2 (Seamless Direct Fallback): Jika Code.gs terkendala izin UrlFetchApp,
+            // panggil API endpoint secara langsung dari browser client
+            if (!response && this.state.aiApiKey) {
+                try {
+                    const directRes = await this.callOpenRouterDirect(prompt, this.state.aiApiKey, this.state.aiModel);
+                    if (directRes && (directRes.temuan || directRes.rekomendasi)) {
+                        response = {
+                            status: "success",
+                            temuan: directRes.temuan,
+                            rekomendasi: directRes.rekomendasi,
+                            model: this.state.aiModel
+                        };
+                        sourceInfo = "Koneksi Langsung (Direct AI)";
+                    }
+                } catch (errDirect) {
+                    console.error("Direct fallback error:", errDirect);
+                    throw new Error(errDirect.message || "Gagal memanggil model GPT OSS 120B");
+                }
+            }
 
             if (response && response.status === "success") {
                 this.state.catatanTemuan = response.temuan || "";
@@ -907,15 +1064,14 @@ PETUNJUK ANALISIS & PENYUSUNAN LAPORAN:
                 this.renderPreview();
 
                 if (typeof App !== "undefined" && typeof App.showToast === "function") {
-                    App.showToast("Analisis & Rekomendasi resmi berhasil dirumuskan oleh model GPT OSS 120B via Code.gs!", "success");
+                    App.showToast(`Analisis & Rekomendasi resmi berhasil dirumuskan oleh GPT OSS 120B (${sourceInfo})!`, "success");
                 }
             } else {
-                const errMsg = response?.message || "Gagal menghasilkan draf dari backend Code.gs";
-                // Jika kunci belum diatur, buka modal
-                if (errMsg.includes("API Key") || !this.state.aiApiKey) {
+                if (!this.state.aiApiKey) {
                     this.openAiConfigModal();
+                    throw new Error("API Key untuk GPT OSS 120B belum diatur. Silakan masukkan API Key di modal.");
                 }
-                throw new Error(errMsg);
+                throw new Error("Gagal mendapatkan respon dari model GPT OSS 120B.");
             }
 
         } catch (err) {

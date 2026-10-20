@@ -1625,6 +1625,17 @@ function handleRecordClientLog(data) {
 // FITUR AI: GENERATOR LAPORAN PENGAWAS KE DINAS (MODEL: GPT OSS 120B)
 // =============================================================================
 
+/**
+ * Jalankan fungsi ini SEKALI di editor Apps Script (pilih authorizeUrlFetch lalu klik Run/Jalankan)
+ * untuk memicu dialog izin akses UrlFetchApp (https://www.googleapis.com/auth/script.external_request).
+ */
+function authorizeUrlFetch() {
+  const test = UrlFetchApp.fetch("https://openrouter.ai/api/v1/models", {
+    muteHttpExceptions: true
+  });
+  Logger.log("Izin UrlFetchApp berhasil diaktifkan! Status Code: " + test.getResponseCode());
+}
+
 function handleGenerateDinasReportAI(data) {
   try {
     const prompt = data.prompt;
