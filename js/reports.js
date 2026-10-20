@@ -9,6 +9,7 @@ const ReportManager = {
     selectedTypeState: "",
     activeSelectedId: "",
     activeTargetSheet: "",
+    selectedReportIds: { kepsek: new Set(), guru: new Set() },
     currentViewMode: { kepsek: "folder", guru: "folder" },
     summaryFilters: {
         kepsek: { status: "all", search: "", teacher: "all" },
@@ -1079,7 +1080,7 @@ const ReportManager = {
 
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="7" class="p-8 text-center text-slate-400 font-medium">
+                    <td colspan="8" class="p-8 text-center text-slate-400 font-medium">
                         <div class="max-w-md mx-auto space-y-2">
                             <i class="fa-regular fa-folder-open text-3xl text-slate-300"></i>
                             <p class="text-xs">${emptyMsg}</p>
@@ -1093,6 +1094,7 @@ const ReportManager = {
                         </div>
                     </td>
                 </tr>`;
+            this.clearSelection(type);
             return;
         }
 
@@ -1109,9 +1111,17 @@ const ReportManager = {
             const isOwner = currentName && itemUploader === currentName;
             const isSchoolKepsek = (currentRole === "Kepala Sekolah" || currentRole === "Kepsek") && currentSchool && itemSchool === currentSchool;
             const canDelete = isPengawas || isOwner || isSchoolKepsek;
+            const isChecked = this.selectedReportIds[type] && this.selectedReportIds[type].has(item.id);
 
             tbody.innerHTML += `
-                <tr class="hover:bg-[#FAF7F0] transition-colors border-b border-[#F0EBE1]">
+                <tr class="hover:bg-[#FAF7F0] transition-colors border-b border-[#F0EBE1] ${isChecked ? 'bg-blue-50/40' : ''}">
+                    <td class="p-3.5 text-center whitespace-nowrap">
+                        <input type="checkbox" class="report-row-cb-${type} w-4 h-4 rounded text-blue-600 border-[#D5CEBF] focus:ring-blue-500 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                            value="${item.id}"
+                            ${!canDelete ? 'disabled title="Anda tidak memiliki izin menghapus berkas ini"' : ''}
+                            ${isChecked ? 'checked' : ''}
+                            onchange="ReportManager.onRowCheckboxChange('${type}', this, '${item.id}')">
+                    </td>
                     <td class="p-3.5 whitespace-nowrap">
                         <p class="font-bold text-slate-800 font-mono text-xs">${item.id}</p>
                         <p class="text-[10px] text-slate-400 font-medium">${item.tanggal}</p>
@@ -1150,6 +1160,98 @@ const ReportManager = {
                 </tr>
             `;
         });
+
+        this.updateBulkBar(type);
+    },
+
+    toggleSelectAll(type, masterCb) {
+        if (!this.selectedReportIds[type]) this.selectedReportIds[type] = new Set();
+        const checked = masterCb.checked;
+        const cbs = document.querySelectorAll(`.report-row-cb-${type}:not(:disabled)`);
+        cbs.forEach(cb => {
+            cb.checked = checked;
+            if (checked) {
+                this.selectedReportIds[type].add(cb.value);
+            } else {
+                this.selectedReportIds[type].delete(cb.value);
+            }
+        });
+        this.updateBulkBar(type);
+    },
+
+    onRowCheckboxChange(type, cb, reportId) {
+        if (!this.selectedReportIds[type]) this.selectedReportIds[type] = new Set();
+        if (cb.checked) {
+            this.selectedReportIds[type].add(reportId);
+        } else {
+            this.selectedReportIds[type].delete(reportId);
+        }
+
+        const total = document.querySelectorAll(`.report-row-cb-${type}:not(:disabled)`).length;
+        const checked = document.querySelectorAll(`.report-row-cb-${type}:checked`).length;
+        const master = document.getElementById(`check-all-${type}`);
+        if (master) {
+            master.checked = (total > 0 && checked === total);
+            master.indeterminate = (checked > 0 && checked < total);
+        }
+        this.updateBulkBar(type);
+    },
+
+    clearSelection(type) {
+        if (this.selectedReportIds[type]) this.selectedReportIds[type].clear();
+        document.querySelectorAll(`.report-row-cb-${type}`).forEach(cb => cb.checked = false);
+        const master = document.getElementById(`check-all-${type}`);
+        if (master) {
+            master.checked = false;
+            master.indeterminate = false;
+        }
+        this.updateBulkBar(type);
+    },
+
+    updateBulkBar(type) {
+        const count = this.selectedReportIds[type] ? this.selectedReportIds[type].size : 0;
+        const bar = document.getElementById(`bulk-bar-${type}`);
+        if (bar) {
+            if (count > 0) {
+                bar.classList.remove("hidden");
+                const badge = bar.querySelector(".bulk-count-badge");
+                if (badge) badge.innerText = count;
+            } else {
+                bar.classList.add("hidden");
+            }
+        }
+    },
+
+    async bulkDeleteReports(type) {
+        const ids = Array.from(this.selectedReportIds[type] || []);
+        if (ids.length === 0) {
+            App.showToast("Tidak ada berkas laporan yang dipilih.", "warning");
+            return;
+        }
+
+        const count = ids.length;
+        const targetSheet = (type === 'kepsek') ? "Laporan_Kepsek" : "Laporan_Guru";
+
+        const confirmed = await App.confirmModal({
+            title: "Hapus Berkas Laporan Terpilih",
+            message: `Apakah Anda yakin ingin menghapus <strong>${count} berkas laporan</strong> terpilih?`,
+            subMessage: "Berkas dokumen terkait di Google Drive juga akan dipindahkan ke Sampah.",
+            confirmText: `Ya, Hapus ${count} Berkas`,
+            confirmType: "danger",
+            icon: "fa-solid fa-trash-can"
+        });
+
+        if (confirmed) {
+            this.clearSelection(type);
+            if (typeof LiveSync !== "undefined") {
+                LiveSync.optimisticDeleteReport(ids, targetSheet);
+                if (this.selectedTypeState) {
+                    this.openSubFolderTable(type, this.selectedTypeState);
+                }
+                this.renderSummaryPoinPenting(type);
+                this.updateBadgeCounts();
+            }
+        }
     },
 
     async confirmDeleteReport(idLaporan, namaPengirim, targetSheet) {
@@ -2481,9 +2583,20 @@ const ReportManager = {
         const switcherWrapper = document.getElementById("wrapper-folder-sekolah-switcher");
         const pillsContainer = document.getElementById("pills-folder-sekolah-schools");
         if (switcherWrapper && pillsContainer) {
-            if (isPengawas && schoolsMeta.length > 1) {
+            // Pastikan daftar sekolah unik (tidak ada duplikasi)
+            const uniqueSchools = [];
+            const seenNames = new Set();
+            schoolsMeta.forEach(s => {
+                const sName = (s.nama || "").trim();
+                if (sName && !seenNames.has(sName.toLowerCase())) {
+                    seenNames.add(sName.toLowerCase());
+                    uniqueSchools.push(s);
+                }
+            });
+
+            if (isPengawas && uniqueSchools.length > 1) {
                 switcherWrapper.classList.remove("hidden");
-                pillsContainer.innerHTML = schoolsMeta.map(s => {
+                pillsContainer.innerHTML = uniqueSchools.map(s => {
                     const isSelected = (s.nama || "").toLowerCase() === targetSchool.toLowerCase();
                     const activeClass = isSelected 
                         ? "bg-indigo-600 text-white font-bold shadow-xs" 

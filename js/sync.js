@@ -55,35 +55,53 @@ const LiveSync = {
     },
 
     /**
-     * Normalisasi data sekolah agar selalu memiliki properti id, nama, driveFolderUrl, dan driveUrl
-     * Serta auto-discovery sekolah yang ada di daftar pengguna (misal SDN 1 Pinoh) jika belum ada di list sekolah
+     * Normalisasi data sekolah agar selalu unik (mencegah duplikasi nama sekolah),
+     * memiliki properti id, nama, driveFolderUrl, dan driveUrl,
+     * serta auto-discovery sekolah yang ada di daftar pengguna jika belum terdaftar di tabel sekolah
      */
     normalizeSchools(schoolsList) {
         if (!Array.isArray(schoolsList)) schoolsList = [];
-        const result = schoolsList.map((s, idx) => {
+        const seen = new Map();
+
+        schoolsList.forEach((s, idx) => {
+            if (!s) return;
+            const sName = (s.nama || "").trim();
+            if (!sName || sName.toLowerCase() === "dinas pendidikan" || sName.toLowerCase() === "dinas") return;
+            const lower = sName.toLowerCase();
             const url = s.driveFolderUrl || s.driveUrl || "";
-            return {
-                id: s.id || s.driveFolderId || `SCH-${String(idx + 1).padStart(3, '0')}`,
-                nama: s.nama || "",
-                driveFolderId: s.driveFolderId || s.id || "",
-                driveFolderUrl: url,
-                driveUrl: url
-            };
+            const folderId = s.driveFolderId || s.id || "";
+
+            if (seen.has(lower)) {
+                // Jika sudah ada sebelumnya, gabungkan (utamakan URL Drive yang valid jika ada yang kosong)
+                const existing = seen.get(lower);
+                if ((!existing.driveFolderUrl || existing.driveFolderUrl === "#") && url && url !== "#") {
+                    existing.driveFolderUrl = url;
+                    existing.driveUrl = url;
+                }
+                if (!existing.driveFolderId && folderId) {
+                    existing.driveFolderId = folderId;
+                }
+            } else {
+                seen.set(lower, {
+                    id: s.id || s.driveFolderId || `SCH-${String(seen.size + 1).padStart(3, '0')}`,
+                    nama: sName,
+                    driveFolderId: folderId,
+                    driveFolderUrl: url,
+                    driveUrl: url
+                });
+            }
         });
 
         // AUTO-DISCOVERY: Temukan sekolah dari daftar pengguna jika belum terdaftar di tabel sekolah
         if (Array.isArray(this.state.users)) {
-            const existingNames = new Set(result.map(s => (s.nama || "").toLowerCase().trim()));
             this.state.users.forEach(u => {
                 const userSchool = (u.asalSekolah || "").trim();
-                if (userSchool && 
-                    userSchool.toLowerCase() !== "dinas pendidikan" && 
-                    userSchool.toLowerCase() !== "dinas" && 
-                    !existingNames.has(userSchool.toLowerCase())) {
-                    existingNames.add(userSchool.toLowerCase());
+                if (!userSchool) return;
+                const lower = userSchool.toLowerCase();
+                if (lower !== "dinas pendidikan" && lower !== "dinas" && !seen.has(lower)) {
                     const fallbackUrl = u.driveUrl || "";
-                    result.push({
-                        id: `SCH-${String(result.length + 1).padStart(3, '0')}`,
+                    seen.set(lower, {
+                        id: `SCH-${String(seen.size + 1).padStart(3, '0')}`,
                         nama: userSchool,
                         driveFolderId: "",
                         driveFolderUrl: fallbackUrl,
@@ -93,7 +111,8 @@ const LiveSync = {
             });
         }
 
-        return result;
+        const result = Array.from(seen.values());
+        return result.sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
     },
 
     /**
@@ -494,25 +513,29 @@ const LiveSync = {
     },
 
     /**
-     * Hapus laporan secara instan di UI lalu hapus di server
+     * Hapus laporan secara instan di UI lalu hapus di server (Mendukung single ID maupun batch array IDs)
      */
-    async optimisticDeleteReport(idLaporan, targetSheet) {
+    async optimisticDeleteReport(idOrIds, targetSheet) {
+        const ids = Array.isArray(idOrIds) ? idOrIds.map(x => x.toString().trim()) : [idOrIds.toString().trim()];
+        const idSet = new Set(ids);
+
         // 1. Hapus dari array lokal seketika
-        this.state.reportsKepsek = this.state.reportsKepsek.filter(x => x.id !== idLaporan);
-        this.state.reportsGuru = this.state.reportsGuru.filter(x => x.id !== idLaporan);
-        this.state.allActivity = this.state.allActivity.filter(x => x.id !== idLaporan);
+        this.state.reportsKepsek = this.state.reportsKepsek.filter(x => !idSet.has(x.id ? x.id.toString().trim() : ""));
+        this.state.reportsGuru = this.state.reportsGuru.filter(x => !idSet.has(x.id ? x.id.toString().trim() : ""));
+        this.state.allActivity = this.state.allActivity.filter(x => !idSet.has(x.id ? x.id.toString().trim() : ""));
 
         // 2. Simpan cache & render seketika (0 ms!)
         this.saveToLocalStorage();
         this.renderAllViews();
-        App.showToast("🗑️ Laporan berhasil dihapus.", "success");
+        App.showToast(ids.length > 1 ? `🗑️ ${ids.length} Laporan berhasil dihapus.` : "🗑️ Laporan berhasil dihapus.", "success");
 
         // 3. Kirim ke server di background
         const currentUser = typeof AuthService !== "undefined" ? AuthService.getUser() : null;
         try {
             const res = await ApiService.post({
                 action: "delete_laporan",
-                idLaporan: idLaporan,
+                idLaporans: ids,
+                idLaporan: ids[0],
                 targetSheet: targetSheet,
                 currentUserRole: currentUser ? currentUser.role : "Guru",
                 currentUserName: currentUser ? currentUser.nama : "",
@@ -530,23 +553,27 @@ const LiveSync = {
     },
 
     /**
-     * Hapus user secara instan di UI lalu hapus di server
+     * Hapus user secara instan di UI lalu hapus di server (Mendukung single ID maupun batch array IDs)
      */
-    async optimisticDeleteUser(userId) {
+    async optimisticDeleteUser(userIdOrIds) {
+        const ids = Array.isArray(userIdOrIds) ? userIdOrIds.map(x => x.toString().trim()) : [userIdOrIds.toString().trim()];
+        const idSet = new Set(ids);
+
         // 1. Hapus dari array lokal
-        this.state.users = this.state.users.filter(u => u.id !== userId);
+        this.state.users = this.state.users.filter(u => !idSet.has(u.id ? u.id.toString().trim() : ""));
 
         // 2. Simpan cache & render seketika (0 ms!)
         this.saveToLocalStorage();
         this.renderAllViews();
-        App.showToast("🗑️ Pengguna berhasil dihapus.", "success");
+        App.showToast(ids.length > 1 ? `🗑️ ${ids.length} Pengguna berhasil dihapus.` : "🗑️ Pengguna berhasil dihapus.", "success");
 
         // 3. Kirim ke server di background
         const currentUser = AuthService.getUser();
         try {
             await ApiService.post({
                 action: "delete_user",
-                userId: userId,
+                userIds: ids,
+                userId: ids[0],
                 currentUserRole: currentUser.role
             });
             this.sync({ silent: true });
@@ -556,27 +583,31 @@ const LiveSync = {
     },
 
     /**
-     * Hapus folder Drive secara instan di UI lalu hapus di server
+     * Hapus folder Drive secara instan di UI lalu hapus di server (Mendukung single ID maupun batch array IDs)
      */
-    async optimisticDeleteFolder(folderId, schoolName) {
+    async optimisticDeleteFolder(folderIdOrIds, schoolName) {
+        const ids = Array.isArray(folderIdOrIds) ? folderIdOrIds.map(x => x.toString().trim()) : [folderIdOrIds.toString().trim()];
+        const idSet = new Set(ids);
+
         // 1. Hapus dari array lokal
         if (schoolName) {
-            this.state.folders = this.state.folders.filter(f => !(f.id === folderId && (f.namaSekolah || "").toLowerCase() === schoolName.toLowerCase()));
+            this.state.folders = this.state.folders.filter(f => !(idSet.has(f.id ? f.id.toString().trim() : "") && (f.namaSekolah || "").toLowerCase() === schoolName.toLowerCase()));
         } else {
-            this.state.folders = this.state.folders.filter(f => f.id !== folderId);
+            this.state.folders = this.state.folders.filter(f => !idSet.has(f.id ? f.id.toString().trim() : ""));
         }
 
         // 2. Simpan cache & render seketika (0 ms!)
         this.saveToLocalStorage();
         this.renderAllViews();
-        App.showToast("🗑️ Folder berhasil dihapus.", "success");
+        App.showToast(ids.length > 1 ? `🗑️ ${ids.length} Folder berhasil dihapus.` : "🗑️ Folder berhasil dihapus.", "success");
 
         // 3. Kirim ke server di background
         const currentUser = AuthService.getUser();
         try {
             await ApiService.post({
                 action: "delete_drive_folder",
-                folderId: folderId,
+                folderIds: ids,
+                folderId: ids[0],
                 schoolName: schoolName || "",
                 currentUserRole: currentUser.role,
                 currentUserSchool: (currentUser ? currentUser.asal_sekolah : "")

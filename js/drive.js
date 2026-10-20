@@ -8,6 +8,7 @@
 const DriveManager = {
     cachedSchools: [],
     cachedFolders: [],
+    selectedFolderIds: new Set(),
 
     /**
      * Memuat data folder dan sekolah dari backend
@@ -102,7 +103,8 @@ const DriveManager = {
         );
 
         if (visibleFolders.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-400 font-medium">Belum ada folder tambahan yang dibuat.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-slate-400 font-medium">Belum ada folder tambahan yang dibuat.</td></tr>`;
+            this.clearSelection();
             return;
         }
 
@@ -112,8 +114,16 @@ const DriveManager = {
                 ? `<span class="bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded text-[10px]">Semua Sekolah</span>`
                 : `<span class="bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded text-[10px]">1 Sekolah</span>`;
 
+            const isChecked = this.selectedFolderIds.has(f.id);
+
             tbody.innerHTML += `
-                <tr class="hover:bg-[#FAF7F0] transition-colors border-b border-[#F0EBE1]">
+                <tr class="hover:bg-[#FAF7F0] transition-colors border-b border-[#F0EBE1] ${isChecked ? 'bg-blue-50/40' : ''}">
+                    <td class="p-3.5 text-center whitespace-nowrap">
+                        <input type="checkbox" class="folder-row-cb w-4 h-4 rounded text-blue-600 border-[#D5CEBF] focus:ring-blue-500 cursor-pointer"
+                            value="${f.id}"
+                            ${isChecked ? 'checked' : ''}
+                            onchange="DriveManager.onRowCheckboxChange(this, '${f.id}')">
+                    </td>
                     <td class="p-3.5 font-mono text-slate-700 font-bold whitespace-nowrap">${f.id}</td>
                     <td class="p-3.5 font-bold text-slate-800 whitespace-nowrap">${f.namaFolder}</td>
                     <td class="p-3.5 font-medium text-slate-700 whitespace-nowrap">${f.namaSekolah}</td>
@@ -132,6 +142,89 @@ const DriveManager = {
                 </tr>
             `;
         });
+
+        this.updateBulkBar();
+    },
+
+    toggleSelectAll(masterCb) {
+        const checked = masterCb.checked;
+        const cbs = document.querySelectorAll(".folder-row-cb");
+        cbs.forEach(cb => {
+            cb.checked = checked;
+            if (checked) {
+                this.selectedFolderIds.add(cb.value);
+            } else {
+                this.selectedFolderIds.delete(cb.value);
+            }
+        });
+        this.updateBulkBar();
+    },
+
+    onRowCheckboxChange(cb, folderId) {
+        if (cb.checked) {
+            this.selectedFolderIds.add(folderId);
+        } else {
+            this.selectedFolderIds.delete(folderId);
+        }
+
+        const total = document.querySelectorAll(".folder-row-cb").length;
+        const checked = document.querySelectorAll(".folder-row-cb:checked").length;
+        const master = document.getElementById("check-all-custom-folders");
+        if (master) {
+            master.checked = (total > 0 && checked === total);
+            master.indeterminate = (checked > 0 && checked < total);
+        }
+        this.updateBulkBar();
+    },
+
+    clearSelection() {
+        this.selectedFolderIds.clear();
+        document.querySelectorAll(".folder-row-cb").forEach(cb => cb.checked = false);
+        const master = document.getElementById("check-all-custom-folders");
+        if (master) {
+            master.checked = false;
+            master.indeterminate = false;
+        }
+        this.updateBulkBar();
+    },
+
+    updateBulkBar() {
+        const count = this.selectedFolderIds.size;
+        const bar = document.getElementById("bulk-bar-custom-folders");
+        if (bar) {
+            if (count > 0) {
+                bar.classList.remove("hidden");
+                const badge = bar.querySelector(".bulk-count-badge");
+                if (badge) badge.innerText = count;
+            } else {
+                bar.classList.add("hidden");
+            }
+        }
+    },
+
+    async bulkDeleteFolders() {
+        const ids = Array.from(this.selectedFolderIds);
+        if (ids.length === 0) {
+            App.showToast("Tidak ada folder yang dipilih.", "warning");
+            return;
+        }
+
+        const count = ids.length;
+        const confirmed = await App.confirmModal({
+            title: "Hapus Folder Terpilih",
+            message: `Apakah Anda yakin ingin menghapus <strong>${count} folder</strong> Google Drive terpilih?`,
+            subMessage: "Folder di Google Drive dan basis data juga akan dipindahkan ke Sampah.",
+            confirmText: `Ya, Hapus ${count} Folder`,
+            confirmType: "danger",
+            icon: "fa-solid fa-trash-can"
+        });
+
+        if (confirmed) {
+            this.clearSelection();
+            if (typeof LiveSync !== "undefined") {
+                LiveSync.optimisticDeleteFolder(ids);
+            }
+        }
     },
 
     async confirmDeleteFolder(folderId, folderName, schoolName) {

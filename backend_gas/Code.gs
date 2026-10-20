@@ -53,6 +53,9 @@ function doPost(e) {
       case "create_user":
         return handleCreateUser(data);
 
+      case "update_user":
+        return handleUpdateUser(data);
+
       case "delete_user":
         return handleDeleteUser(data);
 
@@ -531,12 +534,16 @@ function handleCreateUser(data) {
   });
 }
 
-function handleDeleteUser(data) {
-  const userId = data.userId;
+function handleUpdateUser(data) {
+  const userId = (data.userId || "").toString().trim();
   const requesterRole = data.currentUserRole;
 
   if (requesterRole !== "Pengawas") {
-    return jsonResponse({ status: "error", message: "Hanya Pengawas yang dapat menghapus pengguna." });
+    return jsonResponse({ status: "error", message: "Hanya Pengawas yang berwenang mengubah data pengguna." });
+  }
+
+  if (!userId) {
+    return jsonResponse({ status: "error", message: "ID Pengguna wajib diisi." });
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -544,38 +551,142 @@ function handleDeleteUser(data) {
   const rows = sheetUsers.getDataRange().getValues();
 
   for (let i = 1; i < rows.length; i++) {
-    if (rows[i][0] && rows[i][0].toString() === userId.toString()) {
-      const delUName = rows[i][1] || "-";
-      const delNama = rows[i][4] || "-";
-      const delRole = rows[i][5] || "-";
-      const delSchool = rows[i][6] || "-";
+    if (rows[i][0] && rows[i][0].toString().trim() === userId) {
+      const oldUName = rows[i][1] ? rows[i][1].toString().trim() : "";
+      const newUName = (data.username || oldUName).toString().trim();
+      const newNama = (data.nama || rows[i][4] || "").toString().trim();
+      const newRole = (data.role || rows[i][5] || "Guru").toString().trim();
+      const newSchool = (data.asal_sekolah !== undefined ? data.asal_sekolah : (rows[i][6] || "")).toString().trim();
+      const newStatus = (data.status || rows[i][7] || "Aktif").toString().trim();
 
-      sheetUsers.deleteRow(i + 1);
+      // Cek keunikan username jika diganti
+      if (newUName.toLowerCase() !== oldUName.toLowerCase()) {
+        for (let j = 1; j < rows.length; j++) {
+          if (j !== i && rows[j][1] && rows[j][1].toString().toLowerCase() === newUName.toLowerCase()) {
+            return jsonResponse({ status: "error", message: "Username '" + newUName + "' sudah digunakan oleh akun lain." });
+          }
+        }
+      }
+
+      // Update kolom pada sheet:
+      // Col 2: Username, Col 5: Nama, Col 6: Role, Col 7: Asal Sekolah, Col 8: Status
+      sheetUsers.getRange(i + 1, 2).setValue(newUName);
+      sheetUsers.getRange(i + 1, 5).setValue(newNama);
+      sheetUsers.getRange(i + 1, 6).setValue(newRole);
+      sheetUsers.getRange(i + 1, 7).setValue(newSchool);
+      sheetUsers.getRange(i + 1, 8).setValue(newStatus);
+
+      // Jika diisi password baru, hash dan simpan
+      if (data.password && data.password.toString().trim().length >= 5) {
+        const salt = generateSalt(8);
+        const hash = hashPassword(data.password.toString().trim(), salt);
+        sheetUsers.getRange(i + 1, 3).setValue(hash);
+        sheetUsers.getRange(i + 1, 4).setValue(salt);
+      }
 
       recordAuditLog(
         data.currentUserName || "Pengawas",
         data.currentUserUsername || "-",
         "Pengawas",
         "-",
-        "Hapus Pengguna",
-        "Menghapus pengguna @" + delUName + " (" + delNama + ")",
-        "ID: " + userId + " • Peran: " + delRole + " • Sekolah: " + delSchool
+        "Edit Pengguna",
+        "Mengubah data pengguna @" + newUName + " (" + newNama + ")",
+        "ID: " + userId + " • Peran: " + newRole + " • Sekolah: " + newSchool + " • Status: " + newStatus
       );
 
-      return jsonResponse({ status: "success", message: "Pengguna berhasil dihapus." });
+      return jsonResponse({
+        status: "success",
+        message: "Data pengguna @" + newUName + " berhasil diperbarui."
+      });
     }
+  }
+
+  return jsonResponse({ status: "error", message: "Pengguna dengan ID " + userId + " tidak ditemukan." });
+}
+
+function handleDeleteUser(data) {
+  const requesterRole = data.currentUserRole;
+
+  if (requesterRole !== "Pengawas") {
+    return jsonResponse({ status: "error", message: "Hanya Pengawas yang dapat menghapus pengguna." });
+  }
+
+  // Mendukung single userId maupun batch userIds
+  let targetIds = [];
+  if (Array.isArray(data.userIds) && data.userIds.length > 0) {
+    targetIds = data.userIds.map(id => id.toString().trim());
+  } else if (data.userId) {
+    targetIds = [data.userId.toString().trim()];
+  }
+
+  if (targetIds.length === 0) {
+    return jsonResponse({ status: "error", message: "Tidak ada ID Pengguna yang dipilih." });
+  }
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheetUsers = ss.getSheetByName(SHEET_USERS);
+  const rows = sheetUsers.getDataRange().getValues();
+  const idSet = new Set(targetIds);
+
+  let deletedCount = 0;
+  let deletedInfo = [];
+
+  // Loop mundur dari bawah ke atas agar penghapusan baris tidak merusak indeks
+  for (let i = rows.length - 1; i >= 1; i--) {
+    const rowId = rows[i][0] ? rows[i][0].toString().trim() : "";
+    if (rowId && idSet.has(rowId)) {
+      const delUName = rows[i][1] || "-";
+      const delNama = rows[i][4] || "-";
+      const delRole = rows[i][5] || "-";
+      const delSchool = rows[i][6] || "-";
+
+      sheetUsers.deleteRow(i + 1);
+      deletedCount++;
+      deletedInfo.push("@" + delUName + " (" + delNama + ")");
+    }
+  }
+
+  if (deletedCount > 0) {
+    recordAuditLog(
+      data.currentUserName || "Pengawas",
+      data.currentUserUsername || "-",
+      "Pengawas",
+      "-",
+      "Hapus Pengguna",
+      "Menghapus " + deletedCount + " pengguna: " + deletedInfo.slice(0, 3).join(", ") + (deletedInfo.length > 3 ? "..." : ""),
+      "Total Akun Dihapus: " + deletedCount
+    );
+
+    return jsonResponse({
+      status: "success",
+      message: deletedCount + " pengguna berhasil dihapus dari sistem.",
+      deletedCount: deletedCount
+    });
   }
 
   return jsonResponse({ status: "error", message: "Pengguna tidak ditemukan." });
 }
 
 function handleResetPassword(data) {
-  const username = (data.username || "").trim();
   const newPassword = (data.new_password || "").trim();
   const asalSekolah = (data.asal_sekolah || "").trim();
   const requesterRole = data.currentUserRole || "";
 
-  if (!username) {
+  // Dukungan single username maupun batch usernames (maksimal 2 akun)
+  let targetUsernames = [];
+  if (Array.isArray(data.usernames) && data.usernames.length > 0) {
+    if (data.usernames.length > 2) {
+      return jsonResponse({
+        status: "error",
+        message: "Reset password tidak bisa dipilih sekaligus lebih dari 2 akun! Silakan pilih maksimal 2 akun."
+      });
+    }
+    targetUsernames = data.usernames.map(u => u.toString().trim());
+  } else if (data.username) {
+    targetUsernames = [data.username.toString().trim()];
+  }
+
+  if (targetUsernames.length === 0) {
     return jsonResponse({ status: "error", message: "Username wajib diisi!" });
   }
   if (!newPassword || newPassword.length < 5) {
@@ -585,6 +696,9 @@ function handleResetPassword(data) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheetUsers = ss.getSheetByName(SHEET_USERS);
   const rows = sheetUsers.getDataRange().getValues();
+  const targetSet = new Set(targetUsernames.map(u => u.toLowerCase()));
+
+  let successList = [];
 
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
@@ -594,9 +708,9 @@ function handleResetPassword(data) {
     const uSekolah = (row[6] || "").toString().trim();
     const uStatus = (row[7] || "Aktif").toString().trim();
 
-    if (uName.toLowerCase() === username.toLowerCase()) {
+    if (targetSet.has(uName.toLowerCase())) {
       if (uStatus.toLowerCase() === "nonaktif") {
-        return jsonResponse({ status: "error", message: "Akun ini telah dinonaktifkan oleh Pengawas." });
+        continue;
       }
 
       // Verifikasi identitas jika bukan Pengawas yang mereset
@@ -605,10 +719,7 @@ function handleResetPassword(data) {
         const cleanDbSekolah = uSekolah.toLowerCase().replace(/[^a-z0-9]/g, "");
 
         if (!cleanDbSekolah.includes(cleanReqSekolah) && !cleanReqSekolah.includes(cleanDbSekolah)) {
-          return jsonResponse({
-            status: "error",
-            message: "Verifikasi gagal: Asal sekolah tidak cocok dengan akun @" + uName + "!"
-          });
+          continue;
         }
       }
 
@@ -630,14 +741,19 @@ function handleResetPassword(data) {
         "Diubah oleh: " + (data.currentUserName || uNama) + " (" + (requesterRole || uRole) + ")"
       );
 
-      return jsonResponse({
-        status: "success",
-        message: "Password untuk akun @" + uName + " berhasil diperbarui!"
-      });
+      successList.push("@" + uName);
     }
   }
 
-  return jsonResponse({ status: "error", message: "Username @" + username + " tidak ditemukan dalam sistem." });
+  if (successList.length > 0) {
+    return jsonResponse({
+      status: "success",
+      message: "Password untuk " + successList.join(", ") + " berhasil diperbarui!",
+      updatedCount: successList.length
+    });
+  }
+
+  return jsonResponse({ status: "error", message: "Akun yang dipilih tidak ditemukan dalam sistem." });
 }
 
 // =============================================================================
@@ -665,7 +781,11 @@ function getOrRegisterAllSchools(ss) {
   for (let i = 1; i < rawSekolah.length; i++) {
     const sName = rawSekolah[i][1] ? rawSekolah[i][1].toString().trim() : "";
     if (sName) {
-      existingSchoolNames[sName.toLowerCase()] = true;
+      const lower = sName.toLowerCase();
+      if (existingSchoolNames[lower]) {
+        continue; // Lewati jika nama sekolah sudah pernah tercatat sebelumnya (mencegah duplikasi baris)
+      }
+      existingSchoolNames[lower] = true;
       schoolsList.push({
         id: rawSekolah[i][0] || ("SCH-" + i),
         nama: sName,
@@ -919,8 +1039,6 @@ function handleGetDriveFolders(data) {
 }
 
 function handleDeleteDriveFolder(data) {
-  const folderId = data.folderId;
-  const targetSchool = (data.schoolName || data.targetSchool || "").trim();
   const requesterRole = data.currentUserRole;
   const requesterSchool = (data.currentUserSchool || data.asal_sekolah || "").trim();
   const isPengawas = (requesterRole === "Pengawas");
@@ -930,59 +1048,71 @@ function handleDeleteDriveFolder(data) {
     return jsonResponse({ status: "error", message: "Hanya Pengawas dan Kepala Sekolah yang berwenang menghapus folder Drive." });
   }
 
+  let targetFolderIds = [];
+  if (Array.isArray(data.folderIds) && data.folderIds.length > 0) {
+    targetFolderIds = data.folderIds.map(id => id.toString().trim());
+  } else if (data.folderId) {
+    targetFolderIds = [data.folderId.toString().trim()];
+  }
+
+  if (targetFolderIds.length === 0) {
+    return jsonResponse({ status: "error", message: "ID Folder tidak valid." });
+  }
+
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheetFolder = ss.getSheetByName(SHEET_FOLDER_DRIVE);
   const rows = sheetFolder.getDataRange().getValues();
+  const idSet = new Set(targetFolderIds);
+  const targetSchool = (data.schoolName || data.targetSchool || "").trim();
 
-  for (let i = 1; i < rows.length; i++) {
-    if (rows[i][0] && rows[i][0].toString() === folderId.toString()) {
+  let deletedCount = 0;
+  let deletedNames = [];
+
+  for (let i = rows.length - 1; i >= 1; i--) {
+    const rowId = rows[i][0] ? rows[i][0].toString().trim() : "";
+    if (rowId && idSet.has(rowId)) {
       const rowSchool = rows[i][2] ? rows[i][2].toString().trim() : "";
-      // Jika diberikan targetSchool, pastikan cocok agar tidak salah hapus baris sekolah lain jika ID pernah terduplikasi
       if (targetSchool && rowSchool && rowSchool.toLowerCase() !== targetSchool.toLowerCase()) {
         continue;
       }
 
       const subCategory = (rows[i][7] || "guru").toString().toLowerCase();
-      // KEPALA SEKOLAH HANYA BOLEH MENGHAPUS FOLDER GURU
       if (!isPengawas && subCategory === "kepsek") {
-        return jsonResponse({
-          status: "error",
-          message: "Kepala Sekolah tidak berwenang menghapus folder Kepala Sekolah. Folder tersebut dilindungi dan hanya dapat dikelola oleh Pengawas."
-        });
+        continue; // Kepsek tidak berwenang hapus folder kepsek
+      }
+      if (isKepsek && requesterSchool && rowSchool && rowSchool.toLowerCase() !== requesterSchool.toLowerCase()) {
+        continue;
       }
 
-      if (isKepsek && requesterSchool) {
-        if (!rowSchool || rowSchool.toLowerCase() !== requesterSchool.toLowerCase()) {
-          return jsonResponse({ status: "error", message: "Anda hanya berwenang menghapus folder milik sekolah Anda." });
-        }
-      }
       const driveFolderId = rows[i][4];
       try {
         if (driveFolderId) {
           DriveApp.getFolderById(driveFolderId).setTrashed(true);
         }
-      } catch (e) {
-        // jika folder sudah tidak ada di Drive, lanjutkan hapus dari sheet
-      }
+      } catch (e) {}
 
       const delFolderName = rows[i][1] || "-";
       sheetFolder.deleteRow(i + 1);
-
-      recordAuditLog(
-        data.currentUserName || "Pengawas",
-        data.currentUserUsername || "-",
-        requesterRole,
-        requesterSchool || "-",
-        "Hapus Folder",
-        "Menghapus folder '" + delFolderName + "'",
-        "ID Folder: " + folderId + " • Sekolah: " + rowSchool + " • Subkategori: " + subCategory
-      );
-
-      return jsonResponse({ status: "success", message: "Folder berhasil dihapus dari Google Drive dan database." });
+      deletedCount++;
+      deletedNames.push(delFolderName);
     }
   }
 
-  return jsonResponse({ status: "error", message: "Data folder tidak ditemukan." });
+  if (deletedCount > 0) {
+    recordAuditLog(
+      data.currentUserName || "Pengawas",
+      data.currentUserUsername || "-",
+      requesterRole,
+      requesterSchool || "-",
+      "Hapus Folder",
+      "Menghapus " + deletedCount + " folder: " + deletedNames.slice(0, 3).join(", "),
+      "Total Folder Dihapus: " + deletedCount
+    );
+
+    return jsonResponse({ status: "success", message: deletedCount + " folder berhasil dihapus.", deletedCount: deletedCount });
+  }
+
+  return jsonResponse({ status: "error", message: "Folder tidak ditemukan atau Anda tidak berwenang menghapusnya." });
 }
 
 function handleDeleteDefaultFolder(data) {
@@ -1333,13 +1463,19 @@ function handleVerifikasiLaporan(data) {
 }
 
 function handleDeleteLaporan(data) {
-  const idLaporan = (data.idLaporan || "").toString().trim();
+  let targetIds = [];
+  if (Array.isArray(data.idLaporans) && data.idLaporans.length > 0) {
+    targetIds = data.idLaporans.map(id => id.toString().trim());
+  } else if (data.idLaporan) {
+    targetIds = [data.idLaporan.toString().trim()];
+  }
+
   const targetSheetName = data.targetSheet;
   const requesterRole = data.currentUserRole || "Guru";
   const requesterName = (data.currentUserName || "").trim();
   const requesterSchool = (data.currentUserSchool || "").trim();
 
-  if (!idLaporan) {
+  if (targetIds.length === 0) {
     return jsonResponse({ status: "error", message: "ID Laporan tidak valid." });
   }
 
@@ -1355,31 +1491,32 @@ function handleDeleteLaporan(data) {
     if (s && !sheetsToCheck.includes(s)) sheetsToCheck.push(s);
   });
 
+  const idSet = new Set(targetIds);
+  let deletedCount = 0;
+  let deletedNames = [];
+
+  const isPengawas = (requesterRole === "Pengawas");
+
   for (let s = 0; s < sheetsToCheck.length; s++) {
     const sheet = sheetsToCheck[s];
     const rows = sheet.getDataRange().getValues();
 
-    for (let i = 1; i < rows.length; i++) {
-      if (rows[i][0] && rows[i][0].toString().trim() === idLaporan) {
+    // Loop mundur dari bawah ke atas
+    for (let i = rows.length - 1; i >= 1; i--) {
+      const rowId = rows[i][0] ? rows[i][0].toString().trim() : "";
+      if (rowId && idSet.has(rowId)) {
         const delNamaPengirim = (rows[i][2] || "").toString().trim();
         const delKategori = rows[i][3] || "-";
         const fileUrl = rows[i][4];
         const delSekolah = (rows[i][7] || "").toString().trim();
         const delNamaFile = rows[i][9] || "";
 
-        // Otorisasi: Pengawas dapat menghapus semua laporan.
-        // Semua user role dapat menghapus berkas yang diunggahnya sendiri.
-        // Kepala Sekolah juga dapat menghapus laporan guru dari sekolah yang dipimpinnya.
-        const isPengawas = (requesterRole === "Pengawas");
         const isOwner = (requesterName && delNamaPengirim.toLowerCase() === requesterName.toLowerCase());
         const isSchoolKepsek = (requesterRole === "Kepala Sekolah" || requesterRole === "Kepsek") &&
                                (requesterSchool && delSekolah.toLowerCase() === requesterSchool.toLowerCase());
 
         if (!isPengawas && !isOwner && !isSchoolKepsek) {
-          return jsonResponse({
-            status: "error",
-            message: "Anda hanya berwenang menghapus berkas laporan yang Anda unggah sendiri."
-          });
+          continue; // Lewati berkas yang bukan wewenangnya
         }
 
         // Hapus file dari Google Drive (pindahkan ke sampah)
@@ -1395,39 +1532,35 @@ function handleDeleteLaporan(data) {
               DriveApp.getFileById(fileId).setTrashed(true);
             }
           }
-        } catch (e) {
-          // Abaikan jika file tidak ditemukan di Drive
-        }
+        } catch (e) {}
 
         // Hapus baris dari sheet
         sheet.deleteRow(i + 1);
-
-        // Catat jejak ke Audit Log
-        const logActionDesc = isOwner
-          ? "Menghapus berkas laporan miliknya sendiri: " + idLaporan + " (" + (delNamaFile || delKategori) + ")"
-          : (isPengawas
-              ? "Pengawas menghapus berkas laporan: " + idLaporan + " milik " + delNamaPengirim + " (" + (delNamaFile || delKategori) + ")"
-              : "Kepala Sekolah menghapus berkas laporan guru: " + idLaporan + " milik " + delNamaPengirim + " (" + (delNamaFile || delKategori) + ")");
-
-        recordAuditLog(
-          requesterName || "Pengguna",
-          data.currentUserUsername || "-",
-          requesterRole || "-",
-          requesterSchool || "-",
-          "Hapus Laporan",
-          logActionDesc,
-          "Sekolah: " + delSekolah + " • Berkas: " + (delNamaFile || "-") + " • Kategori: " + delKategori + " • ID: " + idLaporan
-        );
-
-        return jsonResponse({
-          status: "success",
-          message: "Berkas laporan berhasil dihapus dari sistem dan Google Drive!"
-        });
+        deletedCount++;
+        deletedNames.push(rowId);
       }
     }
   }
 
-  return jsonResponse({ status: "error", message: "Data berkas laporan tidak ditemukan." });
+  if (deletedCount > 0) {
+    recordAuditLog(
+      requesterName || "Pengguna",
+      data.currentUserUsername || "-",
+      requesterRole || "-",
+      requesterSchool || "-",
+      "Hapus Laporan",
+      "Menghapus " + deletedCount + " berkas laporan: " + deletedNames.slice(0, 3).join(", "),
+      "Total Laporan Dihapus: " + deletedCount
+    );
+
+    return jsonResponse({
+      status: "success",
+      message: deletedCount + " berkas laporan berhasil dihapus dari sistem dan Google Drive!",
+      deletedCount: deletedCount
+    });
+  }
+
+  return jsonResponse({ status: "error", message: "Data berkas laporan tidak ditemukan atau Anda tidak berwenang." });
 }
 
 // =============================================================================

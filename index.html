@@ -20,7 +20,7 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Custom Stylesheet (Warm Beige Edition) -->
-    <link rel="stylesheet" href="css/style.css?v=2.6.8">
+    <link rel="stylesheet" href="css/style.css?v=2.7.0">
 
     <!-- Immediate Session Checker (Mencegah kedipan login screen saat refresh atau buka tab baru) -->
     <script>
@@ -377,6 +377,112 @@
                     <button type="submit" id="btn-submit-user"
                         class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/30 transition-all flex items-center gap-1.5">
                         <i class="fa-solid fa-check"></i> Simpan Pengguna
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ==================================================================== -->
+    <!-- MODAL EDIT PENGGUNA                                                  -->
+    <!-- ==================================================================== -->
+    <div id="modal-edit-user"
+        class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center hidden p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-3xl p-5 sm:p-7 w-full max-w-lg shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto border border-[#E8E2D5]">
+            <div class="flex justify-between items-center border-b border-[#F0EBE1] pb-3">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-base font-bold">
+                        <i class="fa-solid fa-user-pen"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-800 text-base sm:text-lg leading-tight">
+                            Edit Data Pengguna
+                        </h3>
+                        <p class="text-[11px] text-slate-400">Perbarui profil, peran, asal sekolah, dan status akun</p>
+                    </div>
+                </div>
+                <button onclick="UserManager.closeEditUserModal()" class="text-slate-400 hover:text-slate-600 p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form id="form-edit-user" onsubmit="UserManager.handleSaveEditUser(event);" class="space-y-3.5">
+                <input type="hidden" id="edit-user-id">
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">ID Pengguna</label>
+                        <input type="text" id="edit-user-id-display" disabled
+                            class="w-full border border-[#DCD5C7] px-3 py-2 rounded-xl text-xs sm:text-sm font-mono font-bold text-slate-500 bg-[#FAF8F5]">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Status Akun</label>
+                        <select id="edit-user-status"
+                            class="w-full border border-[#DCD5C7] px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-white focus:ring-2 focus:ring-blue-500">
+                            <option value="Aktif">Aktif</option>
+                            <option value="Nonaktif">Nonaktif</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Nama Lengkap & Gelar</label>
+                    <input type="text" id="edit-user-nama" required
+                        class="w-full border border-[#DCD5C7] px-3.5 py-2.5 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-blue-500"
+                        placeholder="Contoh: Hendri Sapriadi, S.Pd">
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Username Akun</label>
+                        <div class="relative flex items-center">
+                            <span class="absolute left-3 text-slate-400 text-xs font-mono">@</span>
+                            <input type="text" id="edit-user-username" required
+                                class="w-full border border-[#DCD5C7] pl-8 pr-3 py-2.5 rounded-xl text-xs sm:text-sm font-mono focus:ring-2 focus:ring-blue-500"
+                                placeholder="username">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Peran (Role)</label>
+                        <select id="edit-user-role" onchange="UserManager.onEditRoleChange()"
+                            class="w-full border border-[#DCD5C7] px-3 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-white focus:ring-2 focus:ring-blue-500">
+                            <option value="Guru">Guru</option>
+                            <option value="Kepala Sekolah">Kepala Sekolah</option>
+                            <option value="Pengawas">Pengawas</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Asal Sekolah</label>
+                    <select id="edit-user-school"
+                        class="w-full border border-[#DCD5C7] px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-white focus:ring-2 focus:ring-blue-500">
+                    </select>
+                </div>
+
+                <div class="pt-2 border-t border-[#F0EBE1]">
+                    <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                        Password Baru <span class="text-slate-400 font-normal lowercase">(kosongkan jika tidak ingin mengganti)</span>
+                    </label>
+                    <div class="relative flex items-center">
+                        <input type="password" id="edit-user-password"
+                            class="w-full border border-[#DCD5C7] px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-mono text-slate-700 bg-[#FAF8F5] focus:ring-2 focus:ring-blue-500 pr-10"
+                            placeholder="Minimal 5 karakter">
+                        <button type="button" onclick="UserManager.toggleEditPasswordVisibility()" class="absolute right-3 text-slate-400 hover:text-slate-600">
+                            <i id="edit-pwd-icon" class="fa-regular fa-eye-slash text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="pt-3 border-t border-[#F0EBE1] flex justify-end gap-2">
+                    <button type="button" onclick="UserManager.closeEditUserModal()"
+                        class="px-4 py-2 bg-[#F0EBE1] text-slate-700 rounded-xl text-xs font-semibold hover:bg-[#E5DFD3]">
+                        Batal
+                    </button>
+                    <button type="submit" id="btn-save-edit-user"
+                        class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/30 transition-all flex items-center gap-1.5">
+                        <i class="fa-solid fa-floppy-disk"></i> Simpan Perubahan
                     </button>
                 </div>
             </form>
@@ -1264,12 +1370,31 @@
                             </div>
                         </div>
 
+                        <!-- BULK ACTION BAR KEPSEK -->
+                        <div id="bulk-bar-kepsek" class="hidden px-4 py-2.5 bg-blue-50/90 border border-blue-200 rounded-xl flex items-center justify-between gap-3 text-xs shadow-xs">
+                            <div class="flex items-center gap-2">
+                                <span class="w-6 h-6 rounded-lg bg-blue-600 text-white font-bold text-[11px] flex items-center justify-center bulk-count-badge">0</span>
+                                <span class="font-bold text-blue-900">Laporan Terpilih</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="ReportManager.bulkDeleteReports('kepsek')" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-all">
+                                    <i class="fa-solid fa-trash-can"></i> Hapus Terpilih
+                                </button>
+                                <button onclick="ReportManager.clearSelection('kepsek')" class="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-600 rounded-lg font-semibold text-xs border border-slate-200 transition-all">
+                                    Batal
+                                </button>
+                            </div>
+                        </div>
+
                         <!-- TABEL KEPSEK DENGAN DESAIN BARU & TEMA BEIGE -->
                         <div class="bg-white rounded-2xl border border-[#E8E2D5] shadow-sm overflow-hidden">
                             <div class="table-scroll-container">
                                 <table class="custom-table min-w-[760px]">
                                     <thead>
                                         <tr>
+                                            <th class="w-10 text-center whitespace-nowrap">
+                                                <input type="checkbox" id="check-all-kepsek" onchange="ReportManager.toggleSelectAll('kepsek', this)" class="w-4 h-4 rounded text-blue-600 border-[#D5CEBF] focus:ring-blue-500 cursor-pointer">
+                                            </th>
                                             <th class="whitespace-nowrap">ID / Tanggal</th>
                                             <th class="whitespace-nowrap">Kepala Sekolah</th>
                                             <th class="whitespace-nowrap">Kategori & Poin Penting</th>
@@ -1353,12 +1478,31 @@
                             </div>
                         </div>
 
+                        <!-- BULK ACTION BAR GURU -->
+                        <div id="bulk-bar-guru" class="hidden px-4 py-2.5 bg-blue-50/90 border border-blue-200 rounded-xl flex items-center justify-between gap-3 text-xs shadow-xs">
+                            <div class="flex items-center gap-2">
+                                <span class="w-6 h-6 rounded-lg bg-blue-600 text-white font-bold text-[11px] flex items-center justify-center bulk-count-badge">0</span>
+                                <span class="font-bold text-blue-900">Laporan Terpilih</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="ReportManager.bulkDeleteReports('guru')" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-all">
+                                    <i class="fa-solid fa-trash-can"></i> Hapus Terpilih
+                                </button>
+                                <button onclick="ReportManager.clearSelection('guru')" class="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-600 rounded-lg font-semibold text-xs border border-slate-200 transition-all">
+                                    Batal
+                                </button>
+                            </div>
+                        </div>
+
                         <!-- TABEL GURU DENGAN DESAIN BARU & TEMA BEIGE -->
                         <div class="bg-white rounded-2xl border border-[#E8E2D5] shadow-sm overflow-hidden">
                             <div class="table-scroll-container">
                                 <table class="custom-table min-w-[760px]">
                                     <thead>
                                         <tr>
+                                            <th class="w-10 text-center whitespace-nowrap">
+                                                <input type="checkbox" id="check-all-guru" onchange="ReportManager.toggleSelectAll('guru', this)" class="w-4 h-4 rounded text-blue-600 border-[#D5CEBF] focus:ring-blue-500 cursor-pointer">
+                                            </th>
                                             <th class="whitespace-nowrap">ID / Tanggal</th>
                                             <th class="whitespace-nowrap">Nama Guru</th>
                                             <th class="whitespace-nowrap">Kategori & Poin Penting</th>
@@ -1816,12 +1960,34 @@
                         </button>
                     </div>
 
+                    <!-- BULK ACTION BAR USERS -->
+                    <div id="bulk-bar-users" class="hidden px-4 py-2.5 bg-blue-50/90 border border-blue-200 rounded-xl flex items-center justify-between gap-3 text-xs shadow-xs">
+                        <div class="flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-lg bg-blue-600 text-white font-bold text-[11px] flex items-center justify-center bulk-count-badge">0</span>
+                            <span class="font-bold text-blue-900">Pengguna Terpilih</span>
+                        </div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <button onclick="UserManager.bulkResetPassword()" class="btn-bulk-reset px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-all">
+                                <i class="fa-solid fa-key"></i> Reset Password (<span class="text-[10px]">Maks. 2</span>)
+                            </button>
+                            <button onclick="UserManager.bulkDeleteUsers()" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-all">
+                                <i class="fa-solid fa-trash-can"></i> Hapus Terpilih
+                            </button>
+                            <button onclick="UserManager.clearSelection()" class="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-600 rounded-lg font-semibold text-xs border border-slate-200 transition-all">
+                                Batal
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- TABEL PENGGUNA DENGAN DESAIN BARU & TEMA BEIGE -->
                     <div class="bg-white rounded-2xl border border-[#E8E2D5] shadow-sm overflow-hidden">
                         <div class="table-scroll-container">
                             <table class="custom-table min-w-[780px]">
                                 <thead>
                                     <tr>
+                                        <th class="w-10 text-center whitespace-nowrap">
+                                            <input type="checkbox" id="check-all-users" onchange="UserManager.toggleSelectAll(this)" class="w-4 h-4 rounded text-blue-600 border-[#D5CEBF] focus:ring-blue-500 cursor-pointer">
+                                        </th>
                                         <th class="whitespace-nowrap">ID User</th>
                                         <th class="whitespace-nowrap">Nama & Username</th>
                                         <th class="whitespace-nowrap">Peran (Role)</th>
@@ -1850,12 +2016,31 @@
                         </button>
                     </div>
 
+                    <!-- BULK ACTION BAR GURU USERS -->
+                    <div id="bulk-bar-guru-users" class="hidden px-4 py-2.5 bg-blue-50/90 border border-blue-200 rounded-xl flex items-center justify-between gap-3 text-xs shadow-xs">
+                        <div class="flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-lg bg-blue-600 text-white font-bold text-[11px] flex items-center justify-center bulk-count-badge">0</span>
+                            <span class="font-bold text-blue-900">Guru Terpilih</span>
+                        </div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <button onclick="UserManager.bulkResetPassword()" class="btn-bulk-reset px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-all">
+                                <i class="fa-solid fa-key"></i> Reset Password (<span class="text-[10px]">Maks. 2</span>)
+                            </button>
+                            <button onclick="UserManager.clearSelection()" class="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-600 rounded-lg font-semibold text-xs border border-slate-200 transition-all">
+                                Batal
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- TABEL GURU OLEH KEPSEK DENGAN DESAIN BARU & TEMA BEIGE -->
                     <div class="bg-white rounded-2xl border border-[#E8E2D5] shadow-sm overflow-hidden">
                         <div class="table-scroll-container">
                             <table class="custom-table min-w-[780px]">
                                 <thead>
                                     <tr>
+                                        <th class="w-10 text-center whitespace-nowrap">
+                                            <input type="checkbox" id="check-all-guru-users" onchange="UserManager.toggleSelectAll(this)" class="w-4 h-4 rounded text-blue-600 border-[#D5CEBF] focus:ring-blue-500 cursor-pointer">
+                                        </th>
                                         <th class="whitespace-nowrap">ID User</th>
                                         <th class="whitespace-nowrap">Nama & Username</th>
                                         <th class="whitespace-nowrap">Peran</th>
@@ -1892,13 +2077,31 @@
 
                     <!-- Riwayat Folder Kustom -->
                     <div class="bg-white rounded-2xl border border-[#E8E2D5] shadow-sm overflow-hidden">
-                        <div class="p-4 border-b border-[#E8E2D5] bg-[#FAF8F5]">
+                        <div class="p-4 border-b border-[#E8E2D5] bg-[#FAF8F5] flex items-center justify-between flex-wrap gap-2">
                             <h4 class="text-xs font-bold text-slate-800">Riwayat Folder Tambahan (Single & Batch)</h4>
+                        </div>
+                        <!-- BULK ACTION BAR CUSTOM FOLDERS -->
+                        <div id="bulk-bar-custom-folders" class="hidden px-4 py-2.5 bg-blue-50/90 border-b border-blue-200 flex items-center justify-between gap-3 text-xs shadow-xs">
+                            <div class="flex items-center gap-2">
+                                <span class="w-6 h-6 rounded-lg bg-blue-600 text-white font-bold text-[11px] flex items-center justify-center bulk-count-badge">0</span>
+                                <span class="font-bold text-blue-900">Folder Terpilih</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="DriveManager.bulkDeleteFolders()" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-all">
+                                    <i class="fa-solid fa-trash-can"></i> Hapus Terpilih
+                                </button>
+                                <button onclick="DriveManager.clearSelection()" class="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-600 rounded-lg font-semibold text-xs border border-slate-200 transition-all">
+                                    Batal
+                                </button>
+                            </div>
                         </div>
                         <div class="table-scroll-container">
                             <table class="custom-table min-w-[760px]">
                                 <thead>
                                     <tr>
+                                        <th class="w-10 text-center whitespace-nowrap">
+                                            <input type="checkbox" id="check-all-custom-folders" onchange="DriveManager.toggleSelectAll(this)" class="w-4 h-4 rounded text-blue-600 border-[#D5CEBF] focus:ring-blue-500 cursor-pointer">
+                                        </th>
                                         <th class="whitespace-nowrap">ID Folder</th>
                                         <th class="whitespace-nowrap">Nama Folder</th>
                                         <th class="whitespace-nowrap">Sekolah</th>
@@ -2088,17 +2291,17 @@
     </div>
 
     <!-- SCRIPT DEPENDENCIES (MODULAR LOAD ORDER) -->
-    <script src="js/config.js?v=2.6.8"></script>
-    <script src="js/api.js?v=2.6.8"></script>
-    <script src="js/auth.js?v=2.6.8"></script>
-    <script src="js/sync.js?v=2.6.8"></script>
-    <script src="js/users.js?v=2.6.8"></script>
-    <script src="js/drive.js?v=2.6.8"></script>
-    <script src="js/reports.js?v=2.6.8"></script>
-    <script src="js/dashboard.js?v=2.6.8"></script>
-    <script src="js/audit.js?v=2.6.8"></script>
-    <script src="js/dinas-report.js?v=2.6.8"></script>
-    <script src="js/app.js?v=2.6.8"></script>
+    <script src="js/config.js?v=2.7.0"></script>
+    <script src="js/api.js?v=2.7.0"></script>
+    <script src="js/auth.js?v=2.7.0"></script>
+    <script src="js/sync.js?v=2.7.0"></script>
+    <script src="js/users.js?v=2.7.0"></script>
+    <script src="js/drive.js?v=2.7.0"></script>
+    <script src="js/reports.js?v=2.7.0"></script>
+    <script src="js/dashboard.js?v=2.7.0"></script>
+    <script src="js/audit.js?v=2.7.0"></script>
+    <script src="js/dinas-report.js?v=2.7.0"></script>
+    <script src="js/app.js?v=2.7.0"></script>
 </body>
 
 </html>
