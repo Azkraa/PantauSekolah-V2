@@ -20,7 +20,7 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Custom Stylesheet (Warm Beige Edition) -->
-    <link rel="stylesheet" href="css/style.css?v=2.6.1">
+    <link rel="stylesheet" href="css/style.css?v=2.6.2">
 
     <!-- Immediate Session Checker (Mencegah kedipan login screen saat refresh atau buka tab baru) -->
     <script>
@@ -804,6 +804,14 @@
                                 <span class="truncate">Folder Sekolah</span>
                             </button>
 
+                            <button onclick="App.switchTab('laporan-dinas')" id="nav-laporan-dinas"
+                                class="sidebar-nav-btn group w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-400">
+                                <div class="nav-icon-box w-7 h-7 rounded-lg bg-blue-600/10 text-blue-400 flex items-center justify-center text-xs flex-shrink-0">
+                                    <i class="fa-solid fa-building-columns"></i>
+                                </div>
+                                <span class="truncate">Laporan ke Dinas</span>
+                            </button>
+
                             <button onclick="App.switchTab('upload')" id="nav-upload"
                                 class="sidebar-nav-btn group w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-400">
                                 <div class="nav-icon-box w-7 h-7 rounded-lg bg-sky-500/10 text-sky-400 flex items-center justify-center text-xs flex-shrink-0">
@@ -1382,6 +1390,227 @@
                     </div>
                 </div>
 
+                <!-- TAB LAPORAN PENGAWAS KE DINAS PENDIDIKAN -->
+                <div id="tab-laporan-dinas" class="hidden space-y-5">
+                    <!-- Top Action Header Banner (No-Print) -->
+                    <div class="no-print bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white p-5 sm:p-6 rounded-3xl shadow-lg border border-blue-800/40 relative overflow-hidden">
+                        <div class="absolute -right-10 -bottom-10 w-48 h-48 bg-blue-500/10 rounded-full blur-2xl pointer-events-none"></div>
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+                            <div class="space-y-1.5">
+                                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 text-[11px] font-bold border border-blue-400/20 backdrop-blur-xs">
+                                    <i class="fa-solid fa-stamp"></i> Dokumen Resmi Pengawasan
+                                </div>
+                                <h2 class="text-lg sm:text-xl font-black text-white tracking-tight">
+                                    Laporan Pengawas ke Dinas Pendidikan
+                                </h2>
+                                <p class="text-xs text-blue-200/90 max-w-2xl leading-relaxed">
+                                    Susun laporan hasil supervisi manajerial dan akademik satuan pendidikan binaan secara komprehensif, terstruktur, dan siap cetak sesuai juknis kementerian.
+                                </p>
+                            </div>
+                            <div id="dinas-action-buttons" class="flex flex-wrap items-center gap-2 flex-shrink-0">
+                                <button type="button" onclick="DinasReportManager.generateAutoDraft()"
+                                    class="px-3.5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl text-xs font-bold shadow-md shadow-orange-500/20 flex items-center gap-1.5 transition-all cursor-pointer">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> Draf Otomatis
+                                </button>
+                                <button type="button" onclick="DinasReportManager.copySummary()"
+                                    class="px-3.5 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold border border-white/20 flex items-center gap-1.5 transition-all cursor-pointer">
+                                    <i class="fa-solid fa-copy"></i> Salin Ringkasan
+                                </button>
+                                <button type="button" onclick="DinasReportManager.exportCSV()"
+                                    class="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/20 flex items-center gap-1.5 transition-all cursor-pointer">
+                                    <i class="fa-solid fa-file-excel"></i> Ekspor CSV
+                                </button>
+                                <button type="button" onclick="DinasReportManager.printReport()"
+                                    class="px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-blue-500/30 flex items-center gap-1.5 transition-all cursor-pointer">
+                                    <i class="fa-solid fa-print"></i> Cetak / Simpan PDF
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Split Layout: Left Form Parameters & Right Official Paper Preview -->
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start">
+                        <!-- FORM PENGATURAN PARAMETER DOKUMEN (No-Print) -->
+                        <div id="dinas-report-form-container" class="no-print lg:col-span-5 space-y-4">
+                            <div class="bg-white p-5 rounded-3xl border border-[#E8E2D5] shadow-xs space-y-4">
+                                <div class="border-b border-[#F0EBE1] pb-3 flex items-center justify-between">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs">
+                                            <i class="fa-solid fa-sliders"></i>
+                                        </div>
+                                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800">
+                                            Pengaturan Dokumen Laporan
+                                        </h3>
+                                    </div>
+                                    <button type="button" onclick="DinasReportManager.renderPreview()"
+                                        class="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer">
+                                        <i class="fa-solid fa-rotate"></i> Perbarui
+                                    </button>
+                                </div>
+
+                                <!-- Filter Cakupan Sekolah -->
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-700 mb-1">
+                                        Cakupan Satuan Pendidikan
+                                    </label>
+                                    <select id="dinas-filter-sekolah" onchange="DinasReportManager.renderPreview()"
+                                        class="w-full border border-[#DCD5C7] rounded-xl p-2.5 text-xs font-semibold text-slate-800 bg-white focus:ring-2 focus:ring-blue-500">
+                                        <option value="all">🏢 Seluruh Sekolah Binaan</option>
+                                    </select>
+                                </div>
+
+                                <!-- Nomor & Periode Laporan -->
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-slate-700 mb-1">
+                                            Nomor Surat / Berkas
+                                        </label>
+                                        <input type="text" id="dinas-input-nomor" oninput="DinasReportManager.renderPreview()"
+                                            placeholder="421.7/082/DISDIK/..."
+                                            class="w-full border border-[#DCD5C7] rounded-xl p-2 text-xs font-mono text-slate-800 bg-white focus:ring-2 focus:ring-blue-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-slate-700 mb-1">
+                                            Periode Pengawasan
+                                        </label>
+                                        <input type="text" id="dinas-input-periode" oninput="DinasReportManager.renderPreview()"
+                                            placeholder="Semester Ganjil TA 2025/2026"
+                                            class="w-full border border-[#DCD5C7] rounded-xl p-2 text-xs font-semibold text-slate-800 bg-white focus:ring-2 focus:ring-blue-500">
+                                    </div>
+                                </div>
+
+                                <!-- Tanggal Dokumen -->
+                                <div>
+                                    <label class="block text-[11px] font-bold text-slate-700 mb-1">
+                                        Tanggal Pelaporan
+                                    </label>
+                                    <input type="date" id="dinas-input-tanggal" onchange="DinasReportManager.renderPreview()"
+                                        class="w-full border border-[#DCD5C7] rounded-xl p-2 text-xs font-semibold text-slate-800 bg-white focus:ring-2 focus:ring-blue-500">
+                                </div>
+
+                                <!-- Section Identitas Pengawas -->
+                                <div class="pt-3 border-t border-[#F0EBE1] space-y-3">
+                                    <p class="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                                        Identitas Pengawas Pembina
+                                    </p>
+                                    <div class="space-y-2.5">
+                                        <div>
+                                            <label class="block text-[11px] font-medium text-slate-600 mb-0.5">Nama Lengkap & Gelar</label>
+                                            <input type="text" id="dinas-input-nama-pengawas" oninput="DinasReportManager.renderPreview()"
+                                                class="w-full border border-[#DCD5C7] rounded-xl p-2 text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-blue-500">
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label class="block text-[11px] font-medium text-slate-600 mb-0.5">NIP</label>
+                                                <input type="text" id="dinas-input-nip-pengawas" oninput="DinasReportManager.renderPreview()"
+                                                    class="w-full border border-[#DCD5C7] rounded-xl p-2 text-xs font-mono text-slate-800 bg-white focus:ring-2 focus:ring-blue-500">
+                                            </div>
+                                            <div>
+                                                <label class="block text-[11px] font-medium text-slate-600 mb-0.5">Pangkat / Golongan</label>
+                                                <input type="text" id="dinas-input-pangkat-pengawas" oninput="DinasReportManager.renderPreview()"
+                                                    placeholder="Pembina Utama Muda (IV/c)"
+                                                    class="w-full border border-[#DCD5C7] rounded-xl p-2 text-xs text-slate-800 bg-white focus:ring-2 focus:ring-blue-500">
+                                            </div>
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label class="block text-[11px] font-medium text-slate-600 mb-0.5">Jabatan</label>
+                                                <input type="text" id="dinas-input-jabatan-pengawas" oninput="DinasReportManager.renderPreview()"
+                                                    placeholder="Pengawas Sekolah Ahli Madya"
+                                                    class="w-full border border-[#DCD5C7] rounded-xl p-2 text-xs text-slate-800 bg-white focus:ring-2 focus:ring-blue-500">
+                                            </div>
+                                            <div>
+                                                <label class="block text-[11px] font-medium text-slate-600 mb-0.5">Wilayah Rayon</label>
+                                                <input type="text" id="dinas-input-wilayah" oninput="DinasReportManager.renderPreview()"
+                                                    placeholder="Rayon I Wilayah Binaan"
+                                                    class="w-full border border-[#DCD5C7] rounded-xl p-2 text-xs text-slate-800 bg-white focus:ring-2 focus:ring-blue-500">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Section Dinas Pendidikan Tujuan -->
+                                <div class="pt-3 border-t border-[#F0EBE1] space-y-3">
+                                    <p class="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                                        Instansi Dinas Pendidikan & Pejabat
+                                    </p>
+                                    <div class="space-y-2.5">
+                                        <div>
+                                            <label class="block text-[11px] font-medium text-slate-600 mb-0.5">Nama Instansi Dinas (Kop Surat)</label>
+                                            <textarea id="dinas-input-instansi" rows="2" oninput="DinasReportManager.renderPreview()"
+                                                class="w-full border border-[#DCD5C7] rounded-xl p-2 text-xs font-semibold text-slate-800 bg-white focus:ring-2 focus:ring-blue-500"></textarea>
+                                        </div>
+                                        <div>
+                                            <label class="block text-[11px] font-medium text-slate-600 mb-0.5">Alamat Dinas</label>
+                                            <input type="text" id="dinas-input-alamat" oninput="DinasReportManager.renderPreview()"
+                                                class="w-full border border-[#DCD5C7] rounded-xl p-2 text-xs text-slate-800 bg-white focus:ring-2 focus:ring-blue-500">
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label class="block text-[11px] font-medium text-slate-600 mb-0.5">Nama Kepala Dinas</label>
+                                                <input type="text" id="dinas-input-nama-kadis" oninput="DinasReportManager.renderPreview()"
+                                                    class="w-full border border-[#DCD5C7] rounded-xl p-2 text-xs font-bold text-slate-800 bg-white focus:ring-2 focus:ring-blue-500">
+                                            </div>
+                                            <div>
+                                                <label class="block text-[11px] font-medium text-slate-600 mb-0.5">NIP Kepala Dinas</label>
+                                                <input type="text" id="dinas-input-nip-kadis" oninput="DinasReportManager.renderPreview()"
+                                                    class="w-full border border-[#DCD5C7] rounded-xl p-2 text-xs font-mono text-slate-800 bg-white focus:ring-2 focus:ring-blue-500">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Catatan Temuan & Rekomendasi -->
+                                <div class="pt-3 border-t border-[#F0EBE1] space-y-3">
+                                    <div class="flex items-center justify-between">
+                                        <p class="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                                            Evaluasi, Temuan & Rekomendasi
+                                        </p>
+                                        <button type="button" onclick="DinasReportManager.generateAutoDraft()"
+                                            class="text-[10px] font-bold text-amber-600 hover:text-amber-700 flex items-center gap-1 cursor-pointer">
+                                            <i class="fa-solid fa-wand-magic-sparkles"></i> Draf AI
+                                        </button>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-slate-700 mb-1">
+                                            Evaluasi & Temuan Lapangan
+                                        </label>
+                                        <textarea id="dinas-input-temuan" rows="4" oninput="DinasReportManager.renderPreview()"
+                                            placeholder="Tuliskan temuan manajerial dan akademik..."
+                                            class="w-full border border-[#DCD5C7] rounded-xl p-2.5 text-xs text-slate-800 bg-white leading-relaxed focus:ring-2 focus:ring-blue-500"></textarea>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-bold text-slate-700 mb-1">
+                                            Rekomendasi Tindak Lanjut ke Kepala Dinas
+                                        </label>
+                                        <textarea id="dinas-input-rekomendasi" rows="4" oninput="DinasReportManager.renderPreview()"
+                                            placeholder="Tuliskan rekomendasi kebijakan atau tindak lanjut dinas..."
+                                            class="w-full border border-[#DCD5C7] rounded-xl p-2.5 text-xs text-slate-800 bg-white leading-relaxed focus:ring-2 focus:ring-blue-500"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- PRATINJAU DOKUMEN RESMI A4 (Siap Cetak / Print) -->
+                        <div class="lg:col-span-7 space-y-3">
+                            <div class="no-print flex items-center justify-between px-2">
+                                <span class="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-file-invoice text-blue-600"></i> Pratinjau Dokumen Cetak A4
+                                </span>
+                                <span class="text-[11px] text-slate-400">
+                                    Otomatis tersinkronisasi dengan data riil supervisi
+                                </span>
+                            </div>
+
+                            <!-- LEMBAR KERTAS RESMI -->
+                            <div id="dinas-report-paper"
+                                class="bg-white rounded-3xl p-6 sm:p-10 shadow-lg border border-[#E8E2D5] space-y-4 text-slate-800 transition-all">
+                                <!-- Konten dokumen dinas dirender oleh DinasReportManager.renderPreview() -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 4. TAB UPLOAD LAPORAN -->
                 <div id="tab-upload" class="hidden max-w-2xl mx-auto space-y-4">
                     <div class="bg-white p-5 sm:p-8 rounded-2xl border border-[#E8E2D5] shadow-sm">
@@ -1756,16 +1985,17 @@
     </div>
 
     <!-- SCRIPT DEPENDENCIES (MODULAR LOAD ORDER) -->
-    <script src="js/config.js?v=2.6.1"></script>
-    <script src="js/api.js?v=2.6.1"></script>
-    <script src="js/auth.js?v=2.6.1"></script>
-    <script src="js/sync.js?v=2.6.1"></script>
-    <script src="js/users.js?v=2.6.1"></script>
-    <script src="js/drive.js?v=2.6.1"></script>
-    <script src="js/reports.js?v=2.6.1"></script>
-    <script src="js/dashboard.js?v=2.6.1"></script>
-    <script src="js/audit.js?v=2.6.1"></script>
-    <script src="js/app.js?v=2.6.1"></script>
+    <script src="js/config.js?v=2.6.2"></script>
+    <script src="js/api.js?v=2.6.2"></script>
+    <script src="js/auth.js?v=2.6.2"></script>
+    <script src="js/sync.js?v=2.6.2"></script>
+    <script src="js/users.js?v=2.6.2"></script>
+    <script src="js/drive.js?v=2.6.2"></script>
+    <script src="js/reports.js?v=2.6.2"></script>
+    <script src="js/dashboard.js?v=2.6.2"></script>
+    <script src="js/audit.js?v=2.6.2"></script>
+    <script src="js/dinas-report.js?v=2.6.2"></script>
+    <script src="js/app.js?v=2.6.2"></script>
 </body>
 
 </html>

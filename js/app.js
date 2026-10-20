@@ -78,6 +78,7 @@ const App = {
             'verifikasi-kepsek',
             'verifikasi-guru',
             'folder-sekolah',
+            'laporan-dinas',
             'upload',
             'user-manager',
             'guru-manager',
@@ -324,6 +325,7 @@ const App = {
             'verifikasi-kepsek',
             'verifikasi-guru',
             'folder-sekolah',
+            'laporan-dinas',
             'upload',
             'user-manager',
             'guru-manager',
@@ -452,6 +454,12 @@ const App = {
             subTitleEl.innerText = "Pemantauan komprehensif seluruh aktivitas login, unggah, verifikasi, dan manajemen sistem";
             if (typeof AuditManager !== "undefined") {
                 AuditManager.loadAuditLogs();
+            }
+        } else if (tabName === 'laporan-dinas') {
+            titleEl.innerText = "Laporan Pengawas ke Dinas Pendidikan";
+            subTitleEl.innerText = "Penyusunan dokumen resmi, matriks kepatuhan sekolah binaan, serta cetak laporan ke Kepala Dinas";
+            if (typeof DinasReportManager !== "undefined") {
+                DinasReportManager.init();
             }
         }
     },

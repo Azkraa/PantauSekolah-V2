@@ -134,10 +134,11 @@ const AuthService = {
         const navGuruManager = document.getElementById("nav-guru-manager");
         const navDrive = document.getElementById("nav-drive-manager");
         const navAudit = document.getElementById("nav-audit-log");
+        const navLaporanDinas = document.getElementById("nav-laporan-dinas");
         const selectKategori = document.getElementById("kategori-laporan");
 
         // Sembunyikan semua menu role-spesifik terlebih dahulu
-        [navKepsek, navGuru, navFolderSekolah, navUpload, navUsers, navGuruManager, navDrive, navAudit].forEach(el => {
+        [navKepsek, navGuru, navFolderSekolah, navUpload, navUsers, navGuruManager, navDrive, navAudit, navLaporanDinas].forEach(el => {
             if (el) el.classList.add("hidden");
         });
 
@@ -154,6 +155,7 @@ const AuthService = {
                 if (span) span.innerText = "Laporan Guru";
             }
             if (navFolderSekolah) navFolderSekolah.classList.remove("hidden");
+            if (navLaporanDinas) navLaporanDinas.classList.remove("hidden");
             if (navUsers) navUsers.classList.remove("hidden");
             if (navDrive) navDrive.classList.remove("hidden");
             if (navAudit) navAudit.classList.remove("hidden");
