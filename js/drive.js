@@ -9,6 +9,8 @@ const DriveManager = {
     cachedSchools: [],
     cachedFolders: [],
     selectedFolderIds: new Set(),
+    activeFilterFolder: "ALL",
+    searchQuery: "",
 
     /**
      * Memuat data folder dan sekolah dari backend
@@ -28,6 +30,56 @@ const DriveManager = {
         if (typeof LiveSync !== "undefined") {
             LiveSync.sync({ silent: true });
         }
+    },
+
+    /**
+     * Mengisi dropdown filter nama folder secara dinamis beserta jumlahnya
+     */
+    populateFilterFolderDropdown(allValidFolders) {
+        const select = document.getElementById("filter-custom-folder-name");
+        if (!select) return;
+
+        // Hitung frekuensi masing-masing nama folder
+        const counts = {};
+        (allValidFolders || []).forEach(f => {
+            const name = (f.namaFolder || "").trim();
+            if (name) {
+                counts[name] = (counts[name] || 0) + 1;
+            }
+        });
+
+        const sortedNames = Object.keys(counts).sort();
+        const currentVal = this.activeFilterFolder || "ALL";
+
+        let html = `<option value="ALL">Semua Folder (${allValidFolders ? allValidFolders.length : 0})</option>`;
+        sortedNames.forEach(name => {
+            const isSelected = (name.toLowerCase() === currentVal.toLowerCase()) ? "selected" : "";
+            html += `<option value="${name}" ${isSelected}>${name} (${counts[name]})</option>`;
+        });
+
+        select.innerHTML = html;
+        if (currentVal !== "ALL" && !sortedNames.some(n => n.toLowerCase() === currentVal.toLowerCase())) {
+            this.activeFilterFolder = "ALL";
+            select.value = "ALL";
+        }
+    },
+
+    /**
+     * Handler saat filter nama folder diubah
+     */
+    onFilterChange(val) {
+        this.activeFilterFolder = val;
+        this.clearSelection();
+        this.renderCustomFoldersTable();
+    },
+
+    /**
+     * Handler saat input pencarian teks diubah
+     */
+    onSearchChange(val) {
+        this.searchQuery = (val || "").trim();
+        this.clearSelection();
+        this.renderCustomFoldersTable();
     },
 
     /**
@@ -90,15 +142,16 @@ const DriveManager = {
     },
 
     /**
-     * Render riwayat pembuatan folder tambahan
+     * Render riwayat pembuatan folder tambahan dengan dukungan Filter & Search
      */
     renderCustomFoldersTable() {
         const tbody = document.getElementById("table-body-custom-folders");
         if (!tbody) return;
 
-        // Deduplikasi folder jika ada duplikasi ID atau nama+sekolah+subkategori
+        // 1. Deduplikasi & ambil semua folder valid
         const seenFolderKeys = new Set();
-        const visibleFolders = (this.cachedFolders || []).filter(f => {
+        const allValidFolders = [];
+        (this.cachedFolders || []).forEach(f => {
             if (!f || !f.namaFolder) return false;
             if (f.namaFolder.startsWith("__DELETED__:") || (f.id && f.id.toString().startsWith("DEL-"))) return false;
 
@@ -107,19 +160,50 @@ const DriveManager = {
             const sub = (f.subCategory || "guru").trim().toLowerCase();
             const key = `${fName}|||${sName}|||${sub}`;
 
-            if (seenFolderKeys.has(key)) return false;
-            seenFolderKeys.add(key);
+            if (!seenFolderKeys.has(key)) {
+                seenFolderKeys.add(key);
+                allValidFolders.push(f);
+            }
+        });
+
+        // 2. Isi opsi dropdown filter berdasarkan daftar folder valid yang ada
+        this.populateFilterFolderDropdown(allValidFolders);
+
+        // 3. Terapkan Filter Nama Folder & Pencarian Teks
+        const filterVal = (this.activeFilterFolder || "ALL").trim().toLowerCase();
+        const searchVal = (this.searchQuery || "").trim().toLowerCase();
+
+        const filteredFolders = allValidFolders.filter(f => {
+            if (filterVal !== "all") {
+                const fName = (f.namaFolder || "").trim().toLowerCase();
+                if (fName !== filterVal) return false;
+            }
+            if (searchVal) {
+                const fName = (f.namaFolder || "").toLowerCase();
+                const sName = (f.namaSekolah || "").toLowerCase();
+                const fId = (f.id || "").toLowerCase();
+                if (!fName.includes(searchVal) && !sName.includes(searchVal) && !fId.includes(searchVal)) {
+                    return false;
+                }
+            }
             return true;
         });
 
-        if (visibleFolders.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-slate-400 font-medium">Belum ada folder tambahan yang dibuat.</td></tr>`;
-            this.clearSelection();
+        // Update badge total di header tabel
+        const badge = document.getElementById("badge-total-custom-folders");
+        if (badge) {
+            badge.innerText = `${filteredFolders.length} / ${allValidFolders.length}`;
+        }
+
+        if (filteredFolders.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-slate-400 font-medium">Tidak ada folder yang sesuai dengan filter '${this.activeFilterFolder === "ALL" ? "" : this.activeFilterFolder}'.</td></tr>`;
+            this.updateMasterCheckbox();
+            this.updateBulkBar();
             return;
         }
 
         tbody.innerHTML = "";
-        visibleFolders.forEach(f => {
+        filteredFolders.forEach(f => {
             const typeBadge = f.targetType === "all"
                 ? `<span class="bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded text-[10px]">Semua Sekolah</span>`
                 : `<span class="bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded text-[10px]">1 Sekolah</span>`;
@@ -153,13 +237,17 @@ const DriveManager = {
             `;
         });
 
+        this.updateMasterCheckbox();
         this.updateBulkBar();
     },
 
+    /**
+     * Select All: HANYA memilih checkbox yang sedang tampak di tabel (hasil filter aktif)
+     */
     toggleSelectAll(masterCb) {
         const checked = masterCb.checked;
-        const cbs = document.querySelectorAll(".folder-row-cb");
-        cbs.forEach(cb => {
+        const visibleCbs = document.querySelectorAll(".folder-row-cb");
+        visibleCbs.forEach(cb => {
             cb.checked = checked;
             if (checked) {
                 this.selectedFolderIds.add(cb.value);
@@ -170,23 +258,40 @@ const DriveManager = {
         this.updateBulkBar();
     },
 
+    /**
+     * Handler saat checkbox baris individual diubah
+     */
     onRowCheckboxChange(cb, folderId) {
         if (cb.checked) {
             this.selectedFolderIds.add(folderId);
         } else {
             this.selectedFolderIds.delete(folderId);
         }
-
-        const total = document.querySelectorAll(".folder-row-cb").length;
-        const checked = document.querySelectorAll(".folder-row-cb:checked").length;
-        const master = document.getElementById("check-all-custom-folders");
-        if (master) {
-            master.checked = (total > 0 && checked === total);
-            master.indeterminate = (checked > 0 && checked < total);
-        }
+        this.updateMasterCheckbox();
         this.updateBulkBar();
     },
 
+    /**
+     * Sinkronkan status checked & indeterminate pada checkbox induk (Master Select All)
+     */
+    updateMasterCheckbox() {
+        const visibleCbs = document.querySelectorAll(".folder-row-cb");
+        const total = visibleCbs.length;
+        let checkedCount = 0;
+        visibleCbs.forEach(cb => {
+            if (cb.checked) checkedCount++;
+        });
+
+        const master = document.getElementById("check-all-custom-folders");
+        if (master) {
+            master.checked = (total > 0 && checkedCount === total);
+            master.indeterminate = (checkedCount > 0 && checkedCount < total);
+        }
+    },
+
+    /**
+     * Bersihkan seluruh pilihan folder terpilih
+     */
     clearSelection() {
         this.selectedFolderIds.clear();
         document.querySelectorAll(".folder-row-cb").forEach(cb => cb.checked = false);
