@@ -141,7 +141,20 @@ const LiveSync = {
         }
 
         // Ekstrak penanda folder default yang dihapus (__DELETED__:)
-        this.state.hiddenDefaultFolders = [];
+        if (!Array.isArray(this.state.hiddenDefaultFolders)) {
+            this.state.hiddenDefaultFolders = [];
+        }
+        try {
+            const localHidden = JSON.parse(localStorage.getItem("pantausekolah_hidden_default_folders") || "[]");
+            if (Array.isArray(localHidden)) {
+                localHidden.forEach(k => {
+                    if (!this.state.hiddenDefaultFolders.includes(k)) {
+                        this.state.hiddenDefaultFolders.push(k);
+                    }
+                });
+            }
+        } catch (e) {}
+
         if (Array.isArray(this.state.folders)) {
             this.state.folders.forEach(f => {
                 if (f.namaFolder && f.namaFolder.includes("__DELETED__:")) {
@@ -199,6 +212,15 @@ const LiveSync = {
                 if (this.state.folders) {
                     this.state.folders = this.cleanFolders(this.state.folders);
                 }
+                try {
+                    const localHidden = JSON.parse(localStorage.getItem("pantausekolah_hidden_default_folders") || "[]");
+                    if (Array.isArray(localHidden) && localHidden.length > 0) {
+                        this.state.hiddenDefaultFolders = Array.from(new Set([
+                            ...(this.state.hiddenDefaultFolders || []),
+                            ...localHidden
+                        ]));
+                    }
+                } catch (e) {}
                 this.updateLiveIndicator("Cache Siap (0ms)");
             }
         } catch (e) {
@@ -264,6 +286,15 @@ const LiveSync = {
                     this.state.schools = this.normalizeSchools(resAll.schools || []);
                     this.state.users = resAll.users || [];
                     this.state.folders = this.cleanFolders(resAll.folders);
+                    if (Array.isArray(resAll.hiddenDefaultFolders)) {
+                        this.state.hiddenDefaultFolders = Array.from(new Set([
+                            ...(this.state.hiddenDefaultFolders || []),
+                            ...resAll.hiddenDefaultFolders
+                        ]));
+                        try {
+                            localStorage.setItem("pantausekolah_hidden_default_folders", JSON.stringify(this.state.hiddenDefaultFolders));
+                        } catch (e) {}
+                    }
                     if (resAll.auditLogs) {
                         this.state.auditLogs = resAll.auditLogs;
                     }
@@ -307,6 +338,15 @@ const LiveSync = {
                     this.state.schools = this.normalizeSchools(schoolsRaw);
                     if (Array.isArray(dashRes.folders) && dashRes.folders.length > 0) {
                         this.state.folders = this.cleanFolders(dashRes.folders);
+                    }
+                    if (Array.isArray(dashRes.hiddenDefaultFolders)) {
+                        this.state.hiddenDefaultFolders = Array.from(new Set([
+                            ...(this.state.hiddenDefaultFolders || []),
+                            ...dashRes.hiddenDefaultFolders
+                        ]));
+                        try {
+                            localStorage.setItem("pantausekolah_hidden_default_folders", JSON.stringify(this.state.hiddenDefaultFolders));
+                        } catch (e) {}
                     }
                     dataUpdated = true;
                 }

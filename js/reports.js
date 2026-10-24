@@ -781,6 +781,8 @@ const ReportManager = {
         const targetKeyKepsek = `${targetSchool.trim().toLowerCase()}:laporan kepala sekolah`;
         const isKepsekHidden = hiddenList.includes(targetKeyKepsek) || 
                                localHidden.includes(targetKeyKepsek) || 
+                               hiddenList.includes(`all:laporan kepala sekolah`) ||
+                               localHidden.includes(`all:laporan kepala sekolah`) ||
                                isDeletedInFolders("laporan kepala sekolah");
 
         const customFolders = allFolders.filter(f => {
@@ -1658,14 +1660,15 @@ const ReportManager = {
     },
 
     /**
-     * Konfirmasi hapus folder bawaan (Mingguan / Daring)
+     * Konfirmasi hapus folder bawaan (Laporan Kepala Sekolah / Mingguan / Daring)
      */
     async confirmDeleteDefaultFolder(folderType, schoolName) {
         const targetSchool = (schoolName || this.selectedSchoolState || "").trim();
+        const cleanTitle = folderType.startsWith("Laporan ") ? folderType : `Laporan ${folderType}`;
         const confirmed = await App.confirmModal({
-            title: `Hapus Folder Laporan ${folderType}`,
-            message: `Apakah Anda yakin ingin menghapus folder <strong>"Laporan ${folderType}"</strong> untuk sekolah <strong>${targetSchool}</strong>?`,
-            subMessage: "Folder ini akan dihapus dari daftar tampilan Laporan Guru sekolah Anda.",
+            title: `Hapus Folder ${cleanTitle}`,
+            message: `Apakah Anda yakin ingin menghapus folder <strong>"${cleanTitle}"</strong> untuk sekolah <strong>${targetSchool}</strong>?`,
+            subMessage: "Folder ini akan dihapus dari daftar tampilan berkas sekolah.",
             confirmText: "Ya, Hapus Folder",
             confirmType: "danger",
             icon: "fa-solid fa-trash-can"
@@ -1681,28 +1684,18 @@ const ReportManager = {
      */
     deleteDefaultFolder(folderType, schoolName) {
         const targetSchool = (schoolName || this.selectedSchoolState || "").trim();
-        const key = `${targetSchool.toLowerCase()}:${folderType.toLowerCase()}`;
+        const cleanType = folderType.trim().toLowerCase();
+        const key = `${targetSchool.toLowerCase()}:${cleanType}`;
+        const isKepsekFolder = cleanType.includes("kepala sekolah");
 
         // 1. Simpan di LiveSync / localStorage secara lokal untuk perubahan instan 0ms
         if (typeof LiveSync !== "undefined") {
-            if (!LiveSync.state.hiddenDefaultFolders) {
+            if (!Array.isArray(LiveSync.state.hiddenDefaultFolders)) {
                 LiveSync.state.hiddenDefaultFolders = [];
             }
             if (!LiveSync.state.hiddenDefaultFolders.includes(key)) {
                 LiveSync.state.hiddenDefaultFolders.push(key);
             }
-            if (!LiveSync.state.folders) {
-                LiveSync.state.folders = [];
-            }
-            LiveSync.state.folders.push({
-                id: "DEL-TEMP-" + Date.now(),
-                namaFolder: `__DELETED__:${folderType}`,
-                namaSekolah: targetSchool,
-                targetType: "single",
-                driveFolderUrl: "",
-                createdAt: "Baru saja",
-                subCategory: "guru"
-            });
             LiveSync.saveHiddenDefaultFolders();
             this.refreshFolderViews(targetSchool);
         }
@@ -1714,7 +1707,8 @@ const ReportManager = {
             this.refreshFolderViews(targetSchool);
         } catch (e) {}
 
-        App.showToast(`Folder Laporan ${folderType} berhasil dihapus.`, "success");
+        const cleanDisplayName = folderType.startsWith("Laporan ") ? folderType : `Laporan ${folderType}`;
+        App.showToast(`Folder ${cleanDisplayName} berhasil dihapus.`, "success");
 
         // 2. Kirim ke backend di background
         const currentUser = typeof AuthService !== "undefined" ? AuthService.getUser() : null;
@@ -1723,14 +1717,16 @@ const ReportManager = {
                 action: "delete_default_folder",
                 schoolName: targetSchool,
                 folderType: folderType,
-                subCategory: "guru",
+                subCategory: isKepsekFolder ? "kepsek" : "guru",
                 currentUserRole: currentUser.role,
                 currentUserSchool: currentUser.asal_sekolah || ""
             }).then(() => {
                 if (typeof LiveSync !== "undefined") {
                     LiveSync.sync({ silent: true });
                 }
-            }).catch(() => {});
+            }).catch((err) => {
+                console.error("Gagal menghapus folder default di backend:", err);
+            });
         }
     },
 
@@ -2757,6 +2753,8 @@ const ReportManager = {
             const targetKeyKepsek = `${targetSchool.trim().toLowerCase()}:laporan kepala sekolah`;
             const isKepsekHidden = hiddenList.includes(targetKeyKepsek) || 
                                    localHidden.includes(targetKeyKepsek) || 
+                                   hiddenList.includes(`all:laporan kepala sekolah`) ||
+                                   localHidden.includes(`all:laporan kepala sekolah`) ||
                                    isDeletedInFolders("laporan kepala sekolah");
 
             let htmlKepsek = "";

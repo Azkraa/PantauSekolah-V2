@@ -1410,14 +1410,30 @@ function handleGetDashboardData(data) {
   const sheetFolder = ss.getSheetByName(SHEET_FOLDER_DRIVE);
   const rawFolder = sheetFolder ? sheetFolder.getDataRange().getValues() : [];
   let foldersList = [];
+  let hiddenDefaultFolders = [];
   const seenDashFolderKeys = {};
+
   for (let i = 1; i < rawFolder.length; i++) {
     const r = rawFolder[i];
     const fId = r[0] ? r[0].toString() : "";
     const fName = r[1] ? r[1].toString().trim() : "";
     const fSchool = r[2] ? r[2].toString().trim() : "";
     const fSub = (r[7] || "guru").toString().trim().toLowerCase();
-    if (!fName || fName.startsWith("__DELETED__:") || fId.startsWith("DEL-")) continue;
+
+    // Catat penanda folder default yang dihapus / disembunyikan
+    if (fName.startsWith("__DELETED__:")) {
+      const type = fName.replace("__DELETED__:", "").trim().toLowerCase();
+      if (type) {
+        if (fSchool && fSchool.toLowerCase() !== "semua" && fSchool.toLowerCase() !== "all") {
+          hiddenDefaultFolders.push(fSchool.toLowerCase() + ":" + type);
+        } else {
+          hiddenDefaultFolders.push("all:" + type);
+        }
+      }
+      continue;
+    }
+
+    if (!fName || fId.startsWith("DEL-")) continue;
 
     const key = fName.toLowerCase() + "|||" + fSchool.toLowerCase() + "|||" + fSub;
     if (seenDashFolderKeys[key]) continue;
@@ -1452,6 +1468,7 @@ function handleGetDashboardData(data) {
     allActivity: allActivity,
     schools: schoolsList,
     folders: foldersList,
+    hiddenDefaultFolders: hiddenDefaultFolders,
     auditLogs: isPengawas ? getAuditLogsList(ss) : []
   });
 }
@@ -1539,6 +1556,7 @@ function handleSyncAll(data) {
   }
 
   let foldersList = [];
+  let hiddenDefaultFolders = [];
   const seenSyncFolderKeys = {};
   for (let i = 1; i < rawFolder.length; i++) {
     const r = rawFolder[i];
@@ -1546,7 +1564,21 @@ function handleSyncAll(data) {
     const fName = r[1] ? r[1].toString().trim() : "";
     const fSchool = r[2] ? r[2].toString().trim() : "";
     const fSub = (r[7] || "guru").toString().trim().toLowerCase();
-    if (!fName || fName.startsWith("__DELETED__:") || fId.startsWith("DEL-")) continue;
+
+    // Catat penanda folder default yang dihapus / disembunyikan
+    if (fName.startsWith("__DELETED__:")) {
+      const type = fName.replace("__DELETED__:", "").trim().toLowerCase();
+      if (type) {
+        if (fSchool && fSchool.toLowerCase() !== "semua" && fSchool.toLowerCase() !== "all") {
+          hiddenDefaultFolders.push(fSchool.toLowerCase() + ":" + type);
+        } else {
+          hiddenDefaultFolders.push("all:" + type);
+        }
+      }
+      continue;
+    }
+
+    if (!fName || fId.startsWith("DEL-")) continue;
 
     const key = fName.toLowerCase() + "|||" + fSchool.toLowerCase() + "|||" + fSub;
     if (seenSyncFolderKeys[key]) continue;
@@ -1602,6 +1634,7 @@ function handleSyncAll(data) {
     schools: schoolsList,
     users: usersList,
     folders: foldersList,
+    hiddenDefaultFolders: hiddenDefaultFolders,
     auditLogs: isPengawas ? getAuditLogsList(ss) : [],
     timestamp: new Date().toISOString()
   });
