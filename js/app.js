@@ -9,6 +9,9 @@ const App = {
      * Inisialisasi awal saat halaman dimuat
      */
     init() {
+        // 0. Inisialisasi Tema (Dark / Light Mode)
+        this.initTheme();
+
         // 1. Cek Sesi Tersimpan (Session Persistence)
         const hasSession = AuthService.initSession();
 
@@ -472,6 +475,78 @@ const App = {
         const overlay = document.getElementById("sidebar-overlay");
         sidebar.classList.toggle("-translate-x-full");
         overlay.classList.toggle("hidden");
+    },
+
+    /**
+     * Inisialisasi Tema Aplikasi (Light / Dark Mode)
+     */
+    initTheme() {
+        let theme = "light";
+        try {
+            theme = localStorage.getItem("pantausekolah_theme");
+        } catch (e) {}
+
+        const isDark = theme === "dark" || (!theme && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        if (isDark) {
+            document.documentElement.classList.add("dark");
+        } else {
+            document.documentElement.classList.remove("dark");
+        }
+        this.updateThemeUI(isDark);
+    },
+
+    /**
+     * Toggle Tema Gelap / Terang
+     */
+    toggleTheme() {
+        const isCurrentlyDark = document.documentElement.classList.contains("dark");
+        const newIsDark = !isCurrentlyDark;
+
+        if (newIsDark) {
+            document.documentElement.classList.add("dark");
+            try {
+                localStorage.setItem("pantausekolah_theme", "dark");
+            } catch (e) {}
+            this.showToast("Mode Gelap diaktifkan", "success");
+        } else {
+            document.documentElement.classList.remove("dark");
+            try {
+                localStorage.setItem("pantausekolah_theme", "light");
+            } catch (e) {}
+            this.showToast("Mode Terang diaktifkan", "success");
+        }
+
+        this.updateThemeUI(newIsDark);
+
+        // Jika dashboard chart aktif, segarkan chart agar kontras warna teks/grid pas
+        if (typeof Dashboard !== "undefined" && typeof Dashboard.renderCharts === "function") {
+            try {
+                Dashboard.renderCharts();
+            } catch (e) {}
+        }
+    },
+
+    /**
+     * Update UI ikon & label toggle tema
+     */
+    updateThemeUI(isDark) {
+        const icon = document.getElementById("theme-toggle-icon");
+        const text = document.getElementById("theme-toggle-text");
+        const btn = document.getElementById("btn-theme-toggle");
+
+        if (icon) {
+            if (isDark) {
+                icon.className = "fa-solid fa-sun text-xs sm:text-sm text-amber-400";
+            } else {
+                icon.className = "fa-solid fa-moon text-xs sm:text-sm text-slate-700";
+            }
+        }
+        if (text) {
+            text.innerText = isDark ? "Terang" : "Gelap";
+        }
+        if (btn) {
+            btn.title = isDark ? "Beralih ke Mode Terang" : "Beralih ke Mode Gelap";
+        }
     },
 
     /**

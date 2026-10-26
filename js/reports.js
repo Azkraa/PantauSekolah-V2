@@ -357,10 +357,17 @@ const ReportManager = {
                                 <span class="font-bold text-amber-950 text-xs flex items-center gap-1.5 uppercase tracking-wide">
                                     <i class="fa-solid fa-list-check text-amber-600"></i> Poin-Poin Penting Dokumen:
                                 </span>
-                                <a href="${item.fileUrl}" target="_blank"
-                                    class="text-blue-600 hover:text-blue-800 font-bold hover:underline text-xs flex items-center gap-1 bg-white px-2.5 py-1 rounded-lg border border-blue-200 shadow-2xs transition-colors">
-                                    ${fileIcon} <span>Buka File Drive</span> <i class="fa-solid fa-arrow-up-right-from-square text-[9px] ml-0.5"></i>
-                                </a>
+                                ${isPengawas ? `
+                                    <a href="${item.fileUrl}" target="_blank"
+                                        class="text-blue-600 hover:text-blue-800 font-bold hover:underline text-xs flex items-center gap-1 bg-white px-2.5 py-1 rounded-lg border border-blue-200 shadow-2xs transition-colors">
+                                        ${fileIcon} <span>Buka File Drive</span> <i class="fa-solid fa-arrow-up-right-from-square text-[9px] ml-0.5"></i>
+                                    </a>
+                                ` : `
+                                    <button onclick="ReportManager.openModalVerifikasi('${item.id}', '${safeName}', '${item.status}', '${(item.catatan || '').replace(/'/g, "\\'")}', '${targetSheet}')"
+                                        class="text-slate-700 hover:text-blue-700 font-bold text-xs flex items-center gap-1 bg-white px-2.5 py-1 rounded-lg border border-[#DCD5C7] hover:border-blue-300 shadow-2xs transition-colors cursor-pointer">
+                                        ${fileIcon} <span>Pratinjau Berkas</span> <i class="fa-solid fa-eye text-[10px] ml-0.5 text-blue-600"></i>
+                                    </button>
+                                `}
                             </div>
 
                             <div class="text-slate-800 text-xs font-medium leading-relaxed whitespace-pre-line pl-1">
@@ -1092,9 +1099,15 @@ const ReportManager = {
                         </div>
                     </td>
                     <td class="p-3.5 text-center whitespace-nowrap">
-                        <a href="${item.fileUrl}" target="_blank" class="inline-flex items-center gap-1.5 text-slate-700 hover:text-blue-700 font-bold bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 px-2.5 py-1 rounded-lg text-xs transition-colors shadow-2xs">
-                            ${ReportManager.getFileIcon(item.fileUrl, item.namaFile || item.filename, item.kategori)} <span>Buka Berkas</span>
-                        </a>
+                        ${isPengawas ? `
+                            <a href="${item.fileUrl}" target="_blank" class="inline-flex items-center gap-1.5 text-slate-700 hover:text-blue-700 font-bold bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 px-2.5 py-1 rounded-lg text-xs transition-colors shadow-2xs">
+                                ${ReportManager.getFileIcon(item.fileUrl, item.namaFile || item.filename, item.kategori)} <span>Buka Berkas</span>
+                            </a>
+                        ` : `
+                            <button onclick="ReportManager.openModalVerifikasi('${item.id}', '${item.nama.replace(/'/g, "\\'")}', '${item.status}', '${(item.catatan || '').replace(/'/g, "\\'")}', '${targetSheet}')" class="inline-flex items-center gap-1.5 text-slate-700 hover:text-blue-700 font-bold bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 px-2.5 py-1 rounded-lg text-xs transition-colors shadow-2xs cursor-pointer">
+                                ${ReportManager.getFileIcon(item.fileUrl, item.namaFile || item.filename, item.kategori)} <span>Pratinjau</span>
+                            </button>
+                        `}
                     </td>
                     <td class="p-3.5 text-center whitespace-nowrap">${DashboardManager.getStatusBadge(item.status)}</td>
                     <td class="p-3.5 text-slate-600 text-xs max-w-[200px] truncate" title="${item.catatan && item.catatan !== '-' ? item.catatan : ''}">
@@ -2922,9 +2935,15 @@ const ReportManager = {
                         </div>
                     </td>
                     <td class="p-3.5 text-center whitespace-nowrap">
-                        <a href="${item.fileUrl}" target="_blank" class="inline-flex items-center gap-1.5 text-slate-700 hover:text-blue-700 font-bold bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 px-2.5 py-1 rounded-lg text-xs transition-colors shadow-2xs">
-                            ${ReportManager.getFileIcon(item.fileUrl, item.namaFile || item.filename, item.kategori)} <span>Buka Berkas</span>
-                        </a>
+                        ${isPengawas ? `
+                            <a href="${item.fileUrl}" target="_blank" class="inline-flex items-center gap-1.5 text-slate-700 hover:text-blue-700 font-bold bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 px-2.5 py-1 rounded-lg text-xs transition-colors shadow-2xs">
+                                ${ReportManager.getFileIcon(item.fileUrl, item.namaFile || item.filename, item.kategori)} <span>Buka Berkas</span>
+                            </a>
+                        ` : `
+                            <button onclick="ReportManager.openModalVerifikasi('${item.id}', '${item.nama.replace(/'/g, "\\'")}', '${item.status}', '${(item.catatan || '').replace(/'/g, "\\'")}', '${targetSheet}')" class="inline-flex items-center gap-1.5 text-slate-700 hover:text-blue-700 font-bold bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 px-2.5 py-1 rounded-lg text-xs transition-colors shadow-2xs cursor-pointer">
+                                ${ReportManager.getFileIcon(item.fileUrl, item.namaFile || item.filename, item.kategori)} <span>Pratinjau</span>
+                            </button>
+                        `}
                     </td>
                     <td class="p-3.5 text-center whitespace-nowrap">${DashboardManager.getStatusBadge(item.status)}</td>
                     <td class="p-3.5 text-slate-600 text-xs max-w-[200px] truncate" title="${item.catatan && item.catatan !== '-' ? item.catatan : ''}">

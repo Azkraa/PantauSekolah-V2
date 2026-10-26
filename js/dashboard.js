@@ -147,6 +147,8 @@ const DashboardManager = {
                 const ctxStatus = canvasStatus.getContext('2d');
                 if (this.chartStatusInstance) this.chartStatusInstance.destroy();
 
+                const isDark = document.documentElement.classList.contains("dark");
+
                 this.chartStatusInstance = new Chart(ctxStatus, {
                     type: 'doughnut',
                     data: {
@@ -155,7 +157,7 @@ const DashboardManager = {
                             data: [disetujui, menunggu, perbaikan, ditolak],
                             backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'],
                             borderWidth: 2,
-                            borderColor: '#ffffff'
+                            borderColor: isDark ? '#151D2C' : '#ffffff'
                         }]
                     },
                     options: {
@@ -165,6 +167,7 @@ const DashboardManager = {
                             legend: {
                                 position: 'bottom',
                                 labels: {
+                                    color: isDark ? '#CBD5E1' : '#475569',
                                     font: { family: 'Poppins', size: window.innerWidth < 640 ? 9 : 11, weight: '500' },
                                     padding: 12
                                 }
@@ -508,6 +511,10 @@ const DashboardManager = {
             this.chartPerbandinganInstance.destroy();
         }
 
+        const isDark = document.documentElement.classList.contains("dark");
+        const chartGridColor = isDark ? '#243044' : '#F0EBE1';
+        const chartTickColor = isDark ? '#94A3B8' : '#334155';
+
         // Selalu gunakan bar horizontal ('y') agar nama sekolah konsisten dan rapi dibaca
         this.chartPerbandinganInstance = new Chart(ctx, {
             type: 'bar',
@@ -579,9 +586,10 @@ const DashboardManager = {
                         ticks: {
                             stepSize: 1,
                             precision: 0,
+                            color: chartTickColor,
                             font: { family: 'Poppins', size: 10 }
                         },
-                        grid: { color: '#F0EBE1' }
+                        grid: { color: chartGridColor }
                     },
                     y: {
                         afterFit: (axis) => {
@@ -589,7 +597,7 @@ const DashboardManager = {
                         },
                         ticks: {
                             font: { family: 'Poppins', size: window.innerWidth < 640 ? 9 : 11, weight: '500' },
-                            color: '#334155',
+                            color: chartTickColor,
                             padding: 6
                         },
                         grid: { display: false }

@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" fill="none">
+    <!-- Tiang & Bendera Oranye -->
+    <path d="M78 12 L78 40" stroke="#0D47A1" stroke-width="3" stroke-linecap="round"/>
+    <path d="M78 14 Q92 10 104 17 Q94 24 78 27 Z" fill="#F59E0B"/>
+    <circle cx="78" cy="12" r="2.5" fill="#F59E0B"/>
+
+    <!-- Atap Utama / Pediment Gedung Sekolah -->
+    <path d="M78 34 L122 66 L34 66 Z" fill="#0D47A1"/>
+    
+    <!-- Jam Puncak Sekolah -->
+    <circle cx="78" cy="54" r="8.5" fill="#FFFFFF"/>
+    <path d="M78 49 L78 54 L82 54" stroke="#0D47A1" stroke-width="2" stroke-linecap="round"/>
+
+    <!-- Sayap Gedung Kiri & Kanan -->
+    <rect x="24" y="66" width="108" height="66" rx="2" fill="#0D47A1"/>
+
+    <!-- Pilar & Jendela Gedung Sekolah -->
+    <rect x="32" y="74" width="12" height="18" rx="2" fill="#FFFFFF"/>
+    <rect x="32" y="100" width="12" height="18" rx="2" fill="#FFFFFF"/>
+    <rect x="112" y="74" width="12" height="18" rx="2" fill="#FFFFFF"/>
+    <rect x="112" y="100" width="12" height="18" rx="2" fill="#FFFFFF"/>
+    
+    <!-- Dasar Melengkung -->
+    <path d="M14 138 Q78 124 142 138" stroke="#0D47A1" stroke-width="4" stroke-linecap="round"/>
+
+    <!-- Kaca Pembesar (Lup Pemantau) -->
+    <circle cx="78" cy="106" r="30" fill="#FFFFFF" stroke="#0D47A1" stroke-width="7"/>
+    <!-- Gagang Lup -->
+    <path d="M100 128 L124 150" stroke="#0D47A1" stroke-width="9" stroke-linecap="round"/>
+
+    <!-- Siluet Figur Orang (Siswa & Guru) di dalam Lensa Lup -->
+    <!-- Figur 1: Guru/Siswa Utama Kiri -->
+    <circle cx="72" cy="98" r="6" fill="#0D47A1"/>
+    <path d="M60 120 C60 111 65 107 72 107 C79 107 84 111 84 120 Z" fill="#0D47A1"/>
+    <!-- Figur 2: Siswa Kanan (Lebih Kecil) -->
+    <circle cx="86" cy="102" r="5" fill="#3B82F6"/>
+    <path d="M77 122 C77 114 81 110 87 110 C93 110 97 114 97 122 Z" fill="#3B82F6"/>
+</svg>
