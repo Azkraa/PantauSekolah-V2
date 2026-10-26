@@ -778,13 +778,6 @@ const ReportManager = {
             });
         };
 
-        const targetKeyKepsek = `${targetSchool.trim().toLowerCase()}:laporan kepala sekolah`;
-        const isKepsekHidden = hiddenList.includes(targetKeyKepsek) || 
-                               localHidden.includes(targetKeyKepsek) || 
-                               hiddenList.includes(`all:laporan kepala sekolah`) ||
-                               localHidden.includes(`all:laporan kepala sekolah`) ||
-                               isDeletedInFolders("laporan kepala sekolah");
-
         const customFolders = allFolders.filter(f => {
             if (!f.namaFolder || f.namaFolder.startsWith("__DELETED__:") || (f.id && f.id.toString().startsWith("DEL-"))) return false;
             return ReportManager.isFolderForSchool(f, targetSchool) && f.subCategory === "kepsek";
@@ -803,46 +796,7 @@ const ReportManager = {
 
         let html = "";
 
-        // 1. Folder Utama Laporan Kepala Sekolah (1 Folder saja)
-        if (!isKepsekHidden) {
-            const totalKepsek = schoolReports.length;
-            html += `
-                <div onclick="ReportManager.openSubFolderTable('kepsek', 'Laporan Kepala Sekolah')"
-                    class="bg-white p-5 sm:p-6 rounded-2xl border border-[#E8E2D5] shadow-xs hover:shadow-md hover:border-amber-500 transition-all cursor-pointer group flex flex-col justify-between card-hover overflow-hidden">
-                    <div class="flex items-start justify-between gap-3 mb-2.5 min-w-0 w-full">
-                        <div class="flex items-start gap-3.5 min-w-0 flex-1">
-                            <div class="w-12 h-12 sm:w-14 sm:h-14 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center text-xl sm:text-2xl font-bold group-hover:bg-amber-600 group-hover:text-white transition-all flex-shrink-0">
-                                <i class="fa-solid fa-briefcase"></i>
-                            </div>
-                            <div class="min-w-0 flex-1">
-                                <h4 class="font-bold text-slate-800 text-sm sm:text-base group-hover:text-amber-600 transition-colors leading-snug break-words line-clamp-2" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word;">Laporan Kepala Sekolah</h4>
-                                <p class="text-[11px] sm:text-xs text-slate-400 mt-0.5">Arsip & Administrasi Utama</p>
-                                <span class="inline-block mt-1.5 text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-800 rounded-md border border-amber-200">${totalKepsek} Laporan</span>
-                            </div>
-                        </div>
-                        <i class="fa-solid fa-chevron-right text-slate-300 group-hover:text-amber-600 text-xs sm:text-sm flex-shrink-0 mt-1"></i>
-                    </div>
-                    <div class="pt-2.5 border-t border-[#F0EBE1] flex items-center justify-between text-xs mt-1" onclick="event.stopPropagation()">
-                        ${schoolDriveUrl ? `
-                            <a href="${schoolDriveUrl}" target="_blank" class="text-blue-600 hover:text-blue-800 font-bold text-[11px] flex items-center gap-1.5 hover:underline">
-                                <i class="fa-brands fa-google-drive"></i> Buka Drive
-                            </a>
-                        ` : '<span class="text-[10px] text-slate-400">Google Drive</span>'}
-                        ${isPengawas ? `
-                            <button onclick="ReportManager.confirmDeleteDefaultFolder('Laporan Kepala Sekolah', '${safeTargetSchool}')" title="Hapus Folder Laporan Kepala Sekolah" class="text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 border border-rose-200 transition-colors">
-                                <i class="fa-solid fa-trash-can text-[11px]"></i> Hapus
-                            </button>
-                        ` : `
-                            <span class="text-[10px] font-bold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 flex items-center gap-1.5">
-                                <i class="fa-solid fa-lock text-amber-600 text-[10px]"></i> Terkunci • Arsip
-                            </span>
-                        `}
-                    </div>
-                </div>
-            `;
-        }
-
-        // 2. Custom Folders Kepala Sekolah yang Dibuat Pengawas
+        // Folder Kepala Sekolah yang Dibuat Pengawas (Tidak ada folder hardcoded default)
         uniqueCustomFolders.forEach(f => {
             const countCustom = schoolReports.filter(x => {
                 const repType = (x.jenisPelaporan || x.kategori || '').toLowerCase();
@@ -2213,16 +2167,7 @@ const ReportManager = {
         const activeFolders = [];
 
         if (isKepsek) {
-            // Cek folder default Kepala Sekolah
-            const targetKeyKepsek = `${schoolName.toLowerCase()}:laporan kepala sekolah`;
-            const isKepsekHidden = hiddenList.includes(targetKeyKepsek) || 
-                                   localHidden.includes(targetKeyKepsek) || 
-                                   isDeletedInFolders("laporan kepala sekolah");
-            if (!isKepsekHidden) {
-                activeFolders.push("Laporan Kepala Sekolah");
-            }
-
-            // Custom Folders Kepala Sekolah (subCategory === 'kepsek')
+            // Folder Kepala Sekolah: HANYA folder kustom yang dibuat pengawas untuk sekolah ini (subCategory === 'kepsek')
             allFolders.forEach(f => {
                 if (!f.namaFolder || f.namaFolder.startsWith("__DELETED__:") || (f.id && f.id.toString().startsWith("DEL-"))) return;
                 if (ReportManager.isFolderForSchool(f, schoolName) && f.subCategory === "kepsek") {
@@ -2750,51 +2695,9 @@ const ReportManager = {
                 });
             };
 
-            const targetKeyKepsek = `${targetSchool.trim().toLowerCase()}:laporan kepala sekolah`;
-            const isKepsekHidden = hiddenList.includes(targetKeyKepsek) || 
-                                   localHidden.includes(targetKeyKepsek) || 
-                                   hiddenList.includes(`all:laporan kepala sekolah`) ||
-                                   localHidden.includes(`all:laporan kepala sekolah`) ||
-                                   isDeletedInFolders("laporan kepala sekolah");
-
             let htmlKepsek = "";
 
-            // 1. Folder Utama Laporan Kepala Sekolah (1 Folder saja)
-            if (!isKepsekHidden) {
-                const totalKepsek = schoolReportsKepsek.length;
-                htmlKepsek += `
-                    <div class="bg-white p-5 rounded-2xl border border-[#E8E2D5] shadow-xs hover:shadow-md hover:border-amber-400 transition-all flex flex-col justify-between gap-3 overflow-hidden">
-                        <div class="flex items-start gap-3.5 w-full min-w-0">
-                            <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl font-bold border border-amber-100 flex-shrink-0">
-                                <i class="fa-solid fa-briefcase"></i>
-                            </div>
-                            <div class="min-w-0 flex-1">
-                                <h4 class="font-bold text-slate-800 text-sm leading-snug break-words line-clamp-2" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word;">Laporan Kepala Sekolah</h4>
-                                <p class="text-[11px] text-slate-400 mt-0.5">Arsip & Administrasi Utama</p>
-                                <span class="inline-block mt-1.5 text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-800 rounded-md border border-amber-100">${totalKepsek} Berkas</span>
-                            </div>
-                        </div>
-                        <div class="pt-3 border-t border-[#F0EBE1] flex items-center justify-between text-xs">
-                            ${schoolDriveUrl ? `
-                                <a href="${schoolDriveUrl}" target="_blank" class="text-blue-600 hover:text-blue-800 font-bold text-[11px] flex items-center gap-1.5 hover:underline">
-                                    <i class="fa-brands fa-google-drive"></i> Buka Drive
-                                </a>
-                            ` : '<span class="text-[10px] text-slate-400 font-medium">Google Drive</span>'}
-                            ${isPengawas ? `
-                                <button onclick="ReportManager.confirmDeleteDefaultFolder('Laporan Kepala Sekolah', '${safeTargetSchool}')" title="Hapus Folder Laporan Kepala Sekolah" class="text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 border border-rose-200 transition-colors">
-                                    <i class="fa-solid fa-trash-can text-[11px]"></i> Hapus
-                                </button>
-                            ` : `
-                                <span class="text-[10px] font-bold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 flex items-center gap-1.5">
-                                    <i class="fa-solid fa-lock text-amber-600 text-[10px]"></i> Terkunci • Arsip
-                                </span>
-                            `}
-                        </div>
-                    </div>
-                `;
-            }
-
-            // 2. Folder Tambahan Kepala Sekolah (Dibuat Pengawas)
+            // Folder Kepala Sekolah yang Dibuat Pengawas (Tidak ada folder hardcoded default)
             uniqueFoldersKepsek.forEach(f => {
                 const countCustom = schoolReportsKepsek.filter(x => {
                     const repType = (x.jenisPelaporan || x.kategori || '').toLowerCase();
