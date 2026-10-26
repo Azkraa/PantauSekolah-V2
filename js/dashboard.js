@@ -216,6 +216,15 @@ const DashboardManager = {
     getAllSchoolsList() {
         const schoolMap = new Map();
 
+        let deletedSchoolsSet = new Set();
+        try {
+            const raw = localStorage.getItem("pantausekolah_deleted_schools");
+            if (raw) {
+                const arr = JSON.parse(raw);
+                if (Array.isArray(arr)) arr.forEach(x => deletedSchoolsSet.add(x.toString().trim().toLowerCase()));
+            }
+        } catch (e) {}
+
         // Dari cachedData.schools atau LiveSync.state.schools
         const metaSchools = (this.cachedData && this.cachedData.schools)
             ? this.cachedData.schools
@@ -223,7 +232,10 @@ const DashboardManager = {
 
         metaSchools.forEach(s => {
             if (s && s.nama && s.nama.trim()) {
-                schoolMap.set(s.nama.trim().toLowerCase(), s.nama.trim());
+                const lower = s.nama.trim().toLowerCase();
+                if (!deletedSchoolsSet.has(lower) && lower !== "dinas pendidikan" && lower !== "dinas") {
+                    schoolMap.set(lower, s.nama.trim());
+                }
             }
         });
 
@@ -231,7 +243,10 @@ const DashboardManager = {
         const allReports = [...(this.cachedData.reportsKepsek || []), ...(this.cachedData.reportsGuru || [])];
         allReports.forEach(r => {
             if (r && r.asalSekolah && r.asalSekolah.trim()) {
-                schoolMap.set(r.asalSekolah.trim().toLowerCase(), r.asalSekolah.trim());
+                const lower = r.asalSekolah.trim().toLowerCase();
+                if (!deletedSchoolsSet.has(lower) && lower !== "dinas pendidikan" && lower !== "dinas") {
+                    schoolMap.set(lower, r.asalSekolah.trim());
+                }
             }
         });
 
@@ -682,8 +697,10 @@ const DashboardManager = {
                     <p class="text-[11px] text-emerald-600 mt-0.5">Tidak ada sekolah binaan yang memerlukan perhatian khusus saat ini.</p>
                 </div>`;
         } else {
+            const isPengawas = typeof AuthService !== "undefined" && AuthService.getUser()?.role === "Pengawas";
             let htmlAttention = "";
             attentionSchools.forEach(s => {
+                const safeSchool = (s.school || "").replace(/'/g, "\\'");
                 htmlAttention += `
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 bg-amber-50/50 border border-amber-200/80 rounded-xl hover:border-amber-300 transition-colors">
                         <div class="flex items-center gap-2.5 min-w-0">
@@ -695,13 +712,20 @@ const DashboardManager = {
                                 <span class="text-[10px] text-slate-400">${s.hasDriveFolders ? `${s.completed}/${s.totalTarget} folder` : `${s.completed} berkas`}</span>
                             </div>
                         </div>
-                        <div class="flex items-center gap-1 flex-wrap sm:justify-end">
+                        <div class="flex items-center gap-1.5 flex-wrap sm:justify-end">
                             ${s.attentionReasons.map(r => `
                                 <span class="inline-flex items-center gap-1 text-[10px] font-medium text-amber-800 bg-white border border-amber-200 px-2 py-0.5 rounded-md shadow-2xs">
                                     <i class="fa-solid fa-circle-exclamation text-[9px] text-amber-500"></i>
                                     ${r}
                                 </span>
                             `).join("")}
+                            ${isPengawas ? `
+                                <button onclick="ReportManager.confirmDeleteEntireSchool('${safeSchool}')" 
+                                    title="Hapus total sekolah '${s.school}' beserta foldernya agar tidak muncul lagi" 
+                                    class="inline-flex items-center gap-1 text-[10px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-md transition-all cursor-pointer ml-1">
+                                    <i class="fa-solid fa-trash-can text-[9px]"></i> Hapus Total
+                                </button>
+                            ` : ''}
                         </div>
                     </div>`;
             });

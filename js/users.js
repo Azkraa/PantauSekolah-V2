@@ -737,16 +737,50 @@ const UserManager = {
      * Konfirmasi hapus user tunggal
      */
     async confirmDeleteUser(userId, nama) {
+        const currentUser = typeof AuthService !== "undefined" ? AuthService.getUser() : null;
+        const isPengawas = currentUser && currentUser.role === "Pengawas";
+
+        // Cari data pengguna untuk cek apakah peran kepala sekolah
+        const userObj = (typeof LiveSync !== "undefined" && LiveSync.state && Array.isArray(LiveSync.state.users))
+            ? LiveSync.state.users.find(u => (u.id && u.id.toString() === userId.toString()) || (u.username && u.username === userId))
+            : null;
+
+        const isKepsek = userObj && (userObj.role === "Kepala Sekolah" || userObj.role === "Kepsek");
+        const schoolName = (userObj ? (userObj.asalSekolah || "") : "").trim();
+        const hasValidSchool = schoolName && schoolName.toLowerCase() !== "dinas pendidikan" && schoolName.toLowerCase() !== "dinas";
+
         const confirmed = await App.confirmModal({
-            title: "Hapus Pengguna",
+            title: isKepsek && hasValidSchool ? "Hapus Akun Kepala Sekolah" : "Hapus Pengguna",
             message: `Apakah Anda yakin ingin menghapus akun pengguna <strong>"${nama}"</strong> (${userId})?`,
-            subMessage: "Pengguna ini tidak akan dapat login lagi ke sistem PantauSekolah.",
+            subMessage: isKepsek && hasValidSchool 
+                ? `Akun ini adalah Kepala Sekolah untuk <strong>${schoolName}</strong>.<br>Setelah akun dihapus, Anda juga dapat memilih untuk menghapus total folder sekolah agar tidak muncul lagi di dashboard.`
+                : "Pengguna ini tidak akan dapat login lagi ke sistem PantauSekolah.",
             confirmText: "Ya, Hapus Pengguna",
             confirmType: "danger",
             icon: "fa-solid fa-user-xmark"
         });
 
         if (confirmed) {
+            if (isPengawas && isKepsek && hasValidSchool) {
+                // Tanyakan opsi apakah ingin menghapus total sekolah dan foldernya juga
+                const deleteEntire = await App.confirmModal({
+                    title: "Hapus Total Folder Sekolah?",
+                    message: `Apakah Anda juga ingin menghapus TOTAL sekolah <strong>"${schoolName}"</strong> beserta foldernya di Google Drive agar tidak muncul lagi di Dashboard & Folder Sekolah?`,
+                    subMessage: "⚠️ Pilih 'Ya, Hapus Total Sekolah' jika sekolah ini sudah tidak aktif atau salah input. Seluruh folder di Google Drive, data kepatuhan di dashboard, dan arsip laporan akan dibersihkan tuntas.",
+                    confirmText: "Ya, Hapus Total Sekolah",
+                    cancelText: "Tidak, Hapus Akun Saja",
+                    confirmType: "danger",
+                    icon: "fa-solid fa-trash-can"
+                });
+
+                if (deleteEntire) {
+                    if (typeof LiveSync !== "undefined") {
+                        await LiveSync.optimisticDeleteSchool(schoolName);
+                    }
+                    return;
+                }
+            }
+
             this.deleteUser(userId);
         }
     },

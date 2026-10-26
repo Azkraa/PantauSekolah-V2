@@ -62,6 +62,10 @@ function doPost(e) {
       case "delete_user":
         return handleDeleteUser(data);
 
+      case "delete_school":
+      case "delete_entire_school":
+        return handleDeleteSchool(data);
+
       case "get_schools":
         return handleGetSchools();
 
@@ -837,7 +841,7 @@ function handleDeleteUser(data) {
     return jsonResponse({ status: "error", message: "Hanya Pengawas yang dapat menghapus pengguna." });
   }
 
-  // Mendukung single userId maupun batch userIds
+  // Mendukung single userId maupun batch userIds (bisa mencakup ID unik maupun username)
   let targetIds = [];
   if (Array.isArray(data.userIds) && data.userIds.length > 0) {
     targetIds = data.userIds.map(id => id.toString().trim());
@@ -845,7 +849,14 @@ function handleDeleteUser(data) {
     targetIds = [data.userId.toString().trim()];
   }
 
-  if (targetIds.length === 0) {
+  let targetUsernames = [];
+  if (Array.isArray(data.usernames) && data.usernames.length > 0) {
+    targetUsernames = data.usernames.map(u => u.toString().trim().toLowerCase());
+  } else if (data.username) {
+    targetUsernames = [data.username.toString().trim().toLowerCase()];
+  }
+
+  if (targetIds.length === 0 && targetUsernames.length === 0) {
     return jsonResponse({ status: "error", message: "Tidak ada ID Pengguna yang dipilih." });
   }
 
@@ -853,23 +864,47 @@ function handleDeleteUser(data) {
   const sheetUsers = ss.getSheetByName(SHEET_USERS);
   const rows = sheetUsers.getDataRange().getValues();
   const idSet = new Set(targetIds);
+  const usernameSet = new Set(targetUsernames);
 
   let deletedCount = 0;
   let deletedInfo = [];
+  let deletedSchools = [];
 
   // Loop mundur dari bawah ke atas agar penghapusan baris tidak merusak indeks
   for (let i = rows.length - 1; i >= 1; i--) {
     const rowId = rows[i][0] ? rows[i][0].toString().trim() : "";
-    if (rowId && idSet.has(rowId)) {
-      const delUName = rows[i][1] || "-";
+    const rowUName = rows[i][1] ? rows[i][1].toString().trim() : "";
+    const rowUNameLower = rowUName.toLowerCase();
+
+    const isMatch = (rowId && idSet.has(rowId)) || (rowUNameLower && (idSet.has(rowUNameLower) || usernameSet.has(rowUNameLower)));
+
+    if (isMatch) {
       const delNama = rows[i][4] || "-";
       const delRole = rows[i][5] || "-";
       const delSchool = rows[i][6] || "-";
 
+      if (delSchool && delSchool !== "-" && delSchool.toLowerCase() !== "dinas pendidikan") {
+        deletedSchools.push(delSchool);
+      }
+
       sheetUsers.deleteRow(i + 1);
       deletedCount++;
-      deletedInfo.push("@" + delUName + " (" + delNama + ")");
+      deletedInfo.push("@" + rowUName + " (" + delNama + ")");
     }
+  }
+
+  // Jika opsi deleteSchool disertakan (misalnya Pengawas memilih hapus total sekolah bersama kepsek)
+  if (data.deleteSchool && deletedSchools.length > 0) {
+    const uniqueSchools = Array.from(new Set(deletedSchools));
+    uniqueSchools.forEach(function(sch) {
+      try {
+        handleDeleteSchool({
+          currentUserRole: "Pengawas",
+          schoolName: sch,
+          currentUserName: data.currentUserName || "Pengawas"
+        });
+      } catch (e) {}
+    });
   }
 
   if (deletedCount > 0) {
@@ -891,6 +926,128 @@ function handleDeleteUser(data) {
   }
 
   return jsonResponse({ status: "error", message: "Pengguna tidak ditemukan." });
+}
+
+/**
+ * Hapus Total Sekolah: Menghapus permanen sekolah dari sheet Sekolah, Folder_Drive,
+ * akun Users sekolah tersebut, laporan-laporannya, dan memindahkan folder Google Drive ke Sampah (Trash)
+ */
+function handleDeleteSchool(data) {
+  const requesterRole = data.currentUserRole;
+  if (requesterRole !== "Pengawas") {
+    return jsonResponse({ status: "error", message: "Hanya Pengawas yang berhak menghapus total folder sekolah." });
+  }
+
+  const schoolName = (data.schoolName || "").trim();
+  if (!schoolName || schoolName.toLowerCase() === "dinas pendidikan" || schoolName.toLowerCase() === "dinas") {
+    return jsonResponse({ status: "error", message: "Nama sekolah tidak valid atau tidak boleh dihapus." });
+  }
+
+  const cleanSchool = schoolName;
+  const sLower = cleanSchool.toLowerCase();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  let driveFolderIdsToTrash = [];
+
+  // 1. Hapus dari sheet SEKOLAH & ambil folder ID Google Drive
+  const sheetSekolah = ss.getSheetByName(SHEET_SEKOLAH);
+  if (sheetSekolah) {
+    const sRows = sheetSekolah.getDataRange().getValues();
+    for (let i = sRows.length - 1; i >= 1; i--) {
+      const rowSchool = (sRows[i][1] || "").toString().trim().toLowerCase();
+      if (rowSchool === sLower) {
+        const fId = sRows[i][2] ? sRows[i][2].toString().trim() : "";
+        if (fId) driveFolderIdsToTrash.push(fId);
+        sheetSekolah.deleteRow(i + 1);
+      }
+    }
+  }
+
+  // 2. Hapus dari sheet FOLDER DRIVE
+  const sheetFolder = ss.getSheetByName(SHEET_FOLDER_DRIVE);
+  if (sheetFolder) {
+    const fRows = sheetFolder.getDataRange().getValues();
+    for (let i = fRows.length - 1; i >= 1; i--) {
+      const rowSchool = (fRows[i][2] || "").toString().trim().toLowerCase();
+      if (rowSchool === sLower) {
+        const fId = fRows[i][4] ? fRows[i][4].toString().trim() : "";
+        if (fId) driveFolderIdsToTrash.push(fId);
+        sheetFolder.deleteRow(i + 1);
+      }
+    }
+  }
+
+  // 3. Hapus akun pengguna (Kepala Sekolah & Guru) yang terafiliasi dengan sekolah ini
+  const sheetUsers = ss.getSheetByName(SHEET_USERS);
+  let deletedUsersCount = 0;
+  if (sheetUsers) {
+    const uRows = sheetUsers.getDataRange().getValues();
+    for (let i = uRows.length - 1; i >= 1; i--) {
+      const rowSchool = (uRows[i][6] || "").toString().trim().toLowerCase();
+      if (rowSchool === sLower) {
+        sheetUsers.deleteRow(i + 1);
+        deletedUsersCount++;
+      }
+    }
+  }
+
+  // 4. Hapus berkas laporan kepsek & guru dari sekolah ini
+  const sheetKepsek = ss.getSheetByName(SHEET_LAPORAN_KEPSEK);
+  if (sheetKepsek) {
+    const kRows = sheetKepsek.getDataRange().getValues();
+    for (let i = kRows.length - 1; i >= 1; i--) {
+      const rowSchool = (kRows[i][7] || "").toString().trim().toLowerCase();
+      if (rowSchool === sLower) {
+        sheetKepsek.deleteRow(i + 1);
+      }
+    }
+  }
+
+  const sheetGuru = ss.getSheetByName(SHEET_LAPORAN_GURU);
+  if (sheetGuru) {
+    const gRows = sheetGuru.getDataRange().getValues();
+    for (let i = gRows.length - 1; i >= 1; i--) {
+      const rowSchool = (gRows[i][7] || "").toString().trim().toLowerCase();
+      if (rowSchool === sLower) {
+        sheetGuru.deleteRow(i + 1);
+      }
+    }
+  }
+
+  // 5. Pindahkan folder sekolah di Google Drive ke Sampah (Trash)
+  driveFolderIdsToTrash.forEach(function(fId) {
+    try {
+      const f = DriveApp.getFolderById(fId);
+      f.setTrashed(true);
+    } catch (e) {}
+  });
+
+  // Cari juga di folder root jika ada nama folder persis "[schoolName] - Arsip PantauSekolah"
+  try {
+    const rootFolder = getOrCreateRootFolder();
+    const exactFolders = rootFolder.getFoldersByName("[" + cleanSchool + "] - Arsip PantauSekolah");
+    while (exactFolders.hasNext()) {
+      try {
+        exactFolders.next().setTrashed(true);
+      } catch (e) {}
+    }
+  } catch (e) {}
+
+  // 6. Catat Audit Log
+  recordAuditLog(
+    data.currentUserName || "Pengawas",
+    data.currentUserUsername || "-",
+    "Pengawas",
+    cleanSchool,
+    "Hapus Total Sekolah",
+    "Menghapus permanen sekolah '" + cleanSchool + "' beserta seluruh folder Google Drive, akun, dan dokumennya.",
+    "Status: Dihapus Total • Akun Dihapus: " + deletedUsersCount
+  );
+
+  return jsonResponse({
+    status: "success",
+    message: "Sekolah '" + cleanSchool + "' beserta seluruh folder Drive dan datanya berhasil dihapus total dari sistem."
+  });
 }
 
 function handleResetPassword(data) {

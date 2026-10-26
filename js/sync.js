@@ -55,6 +55,69 @@ const LiveSync = {
     },
 
     /**
+     * Dapatkan daftar sekolah yang telah dihapus permanen oleh pengawas
+     */
+    getDeletedSchoolsSet() {
+        const set = new Set();
+        try {
+            const raw = localStorage.getItem("pantausekolah_deleted_schools");
+            if (raw) {
+                const arr = JSON.parse(raw);
+                if (Array.isArray(arr)) arr.forEach(x => set.add(x.toString().trim().toLowerCase()));
+            }
+        } catch (e) {}
+        return set;
+    },
+
+    /**
+     * Dapatkan daftar username pengguna yang telah dihapus permanen
+     */
+    getDeletedUsernamesSet() {
+        const set = new Set();
+        try {
+            const raw = localStorage.getItem("pantausekolah_deleted_usernames");
+            if (raw) {
+                const arr = JSON.parse(raw);
+                if (Array.isArray(arr)) arr.forEach(x => set.add(x.toString().trim().toLowerCase()));
+            }
+        } catch (e) {}
+        return set;
+    },
+
+    /**
+     * Terapkan filter client-side untuk membuang sekolah / pengguna yang sudah dihapus permanen
+     */
+    applyClientFilters(data) {
+        if (!data) return data;
+        const deletedSchools = this.getDeletedSchoolsSet();
+        const deletedUsers = this.getDeletedUsernamesSet();
+
+        if (Array.isArray(data.schools)) {
+            data.schools = data.schools.filter(s => !deletedSchools.has((s.nama || "").trim().toLowerCase()));
+        }
+        if (Array.isArray(data.users)) {
+            data.users = data.users.filter(u => {
+                const un = (u.username || "").trim().toLowerCase();
+                const us = (u.asalSekolah || "").trim().toLowerCase();
+                return !deletedUsers.has(un) && !deletedSchools.has(us);
+            });
+        }
+        if (Array.isArray(data.folders)) {
+            data.folders = data.folders.filter(f => !deletedSchools.has((f.namaSekolah || "").trim().toLowerCase()));
+        }
+        if (Array.isArray(data.reportsKepsek)) {
+            data.reportsKepsek = data.reportsKepsek.filter(r => !deletedSchools.has((r.asalSekolah || "").trim().toLowerCase()));
+        }
+        if (Array.isArray(data.reportsGuru)) {
+            data.reportsGuru = data.reportsGuru.filter(r => !deletedSchools.has((r.asalSekolah || "").trim().toLowerCase()));
+        }
+        if (Array.isArray(data.allActivity)) {
+            data.allActivity = data.allActivity.filter(a => !deletedSchools.has((a.asalSekolah || "").trim().toLowerCase()));
+        }
+        return data;
+    },
+
+    /**
      * Normalisasi data sekolah agar selalu unik (mencegah duplikasi nama sekolah),
      * memiliki properti id, nama, driveFolderUrl, dan driveUrl,
      * serta auto-discovery sekolah yang ada di daftar pengguna jika belum terdaftar di tabel sekolah
@@ -62,12 +125,15 @@ const LiveSync = {
     normalizeSchools(schoolsList) {
         if (!Array.isArray(schoolsList)) schoolsList = [];
         const seen = new Map();
+        const deletedSchools = this.getDeletedSchoolsSet();
 
         schoolsList.forEach((s, idx) => {
             if (!s) return;
             const sName = (s.nama || "").trim();
             if (!sName || sName.toLowerCase() === "dinas pendidikan" || sName.toLowerCase() === "dinas") return;
             const lower = sName.toLowerCase();
+            if (deletedSchools.has(lower)) return; // Jangan masukkan sekolah yang telah dihapus permanen
+
             const url = s.driveFolderUrl || s.driveUrl || "";
             const folderId = s.driveFolderId || s.id || "";
 
@@ -98,7 +164,7 @@ const LiveSync = {
                 const userSchool = (u.asalSekolah || "").trim();
                 if (!userSchool) return;
                 const lower = userSchool.toLowerCase();
-                if (lower !== "dinas pendidikan" && lower !== "dinas" && !seen.has(lower)) {
+                if (lower !== "dinas pendidikan" && lower !== "dinas" && !seen.has(lower) && !deletedSchools.has(lower)) {
                     const fallbackUrl = u.driveUrl || "";
                     seen.set(lower, {
                         id: `SCH-${String(seen.size + 1).padStart(3, '0')}`,
@@ -286,6 +352,7 @@ const LiveSync = {
                     this.state.schools = this.normalizeSchools(resAll.schools || []);
                     this.state.users = resAll.users || [];
                     this.state.folders = this.cleanFolders(resAll.folders);
+                    this.applyClientFilters(this.state);
                     if (Array.isArray(resAll.hiddenDefaultFolders)) {
                         this.state.hiddenDefaultFolders = Array.from(new Set([
                             ...(this.state.hiddenDefaultFolders || []),
@@ -365,6 +432,7 @@ const LiveSync = {
                     this.state.folders = this.cleanFolders(results[3].folders || this.state.folders);
                     dataUpdated = true;
                 }
+                this.applyClientFilters(this.state);
             }
 
             // Isolasi Folder Sekolah: Non-Pengawas HANYA boleh memiliki folder milik sekolahnya sendiri
@@ -662,12 +730,40 @@ const LiveSync = {
     /**
      * Hapus user secara instan di UI lalu hapus di server (Mendukung single ID maupun batch array IDs)
      */
-    async optimisticDeleteUser(userIdOrIds) {
+    async optimisticDeleteUser(userIdOrIds, options = {}) {
         const ids = Array.isArray(userIdOrIds) ? userIdOrIds.map(x => x.toString().trim()) : [userIdOrIds.toString().trim()];
         const idSet = new Set(ids);
 
+        // Kumpulkan username untuk proteksi blacklist & kecocokan server
+        const targetUsernames = [];
+        this.state.users.forEach(u => {
+            const uid = u.id ? u.id.toString().trim() : "";
+            if (idSet.has(uid) && u.username) {
+                targetUsernames.push(u.username.trim().toLowerCase());
+            }
+        });
+
+        // Simpan username ke deleted usernames blacklist
+        if (targetUsernames.length > 0) {
+            let deletedUsers = [];
+            try {
+                const raw = localStorage.getItem("pantausekolah_deleted_usernames");
+                if (raw) deletedUsers = JSON.parse(raw);
+            } catch (e) {}
+            targetUsernames.forEach(un => {
+                if (!deletedUsers.includes(un)) deletedUsers.push(un);
+            });
+            try {
+                localStorage.setItem("pantausekolah_deleted_usernames", JSON.stringify(deletedUsers));
+            } catch (e) {}
+        }
+
         // 1. Hapus dari array lokal
-        this.state.users = this.state.users.filter(u => !idSet.has(u.id ? u.id.toString().trim() : ""));
+        this.state.users = this.state.users.filter(u => {
+            const uid = u.id ? u.id.toString().trim() : "";
+            const uname = u.username ? u.username.trim().toLowerCase() : "";
+            return !idSet.has(uid) && !targetUsernames.includes(uname);
+        });
 
         // 2. Simpan cache & render seketika (0 ms!)
         this.saveToLocalStorage();
@@ -681,11 +777,74 @@ const LiveSync = {
                 action: "delete_user",
                 userIds: ids,
                 userId: ids[0],
-                currentUserRole: currentUser.role
+                usernames: targetUsernames,
+                username: targetUsernames[0] || "",
+                deleteSchool: options.deleteSchool ? true : false,
+                currentUserName: currentUser ? currentUser.nama : "Pengawas",
+                currentUserRole: currentUser ? currentUser.role : "Pengawas"
             });
             this.sync({ silent: true });
         } catch (e) {
             App.showToast("Gagal menghapus pengguna di server.", "error");
+        }
+    },
+
+    /**
+     * Hapus total sekolah dan seluruh datanya (0ms optimistik di UI + server di background)
+     */
+    async optimisticDeleteSchool(schoolName) {
+        if (!schoolName) return;
+        const cleanSchool = schoolName.trim();
+        const sLower = cleanSchool.toLowerCase();
+
+        // 1. Simpan ke daftar sekolah terhapus di localStorage agar tidak di-restore oleh live sync berikutnya
+        let deletedSchools = [];
+        try {
+            const raw = localStorage.getItem("pantausekolah_deleted_schools");
+            if (raw) deletedSchools = JSON.parse(raw);
+        } catch (e) {}
+        if (!deletedSchools.includes(sLower)) {
+            deletedSchools.push(sLower);
+            try {
+                localStorage.setItem("pantausekolah_deleted_schools", JSON.stringify(deletedSchools));
+            } catch (e) {}
+        }
+
+        // 2. Bersihkan sekolah dari seluruh state lokal
+        this.state.schools = (this.state.schools || []).filter(s => (s.nama || "").trim().toLowerCase() !== sLower);
+        this.state.users = (this.state.users || []).filter(u => (u.asalSekolah || "").trim().toLowerCase() !== sLower);
+        this.state.folders = (this.state.folders || []).filter(f => (f.namaSekolah || "").trim().toLowerCase() !== sLower);
+        this.state.reportsKepsek = (this.state.reportsKepsek || []).filter(r => (r.asalSekolah || "").trim().toLowerCase() !== sLower);
+        this.state.reportsGuru = (this.state.reportsGuru || []).filter(r => (r.asalSekolah || "").trim().toLowerCase() !== sLower);
+        this.state.allActivity = (this.state.allActivity || []).filter(a => (a.asalSekolah || "").trim().toLowerCase() !== sLower);
+
+        // Bersihkan cache pemilihan aktif jika sedang membuka sekolah tersebut
+        try {
+            if ((localStorage.getItem("pantausekolah_folder_sekolah_school") || "").toLowerCase() === sLower) {
+                localStorage.removeItem("pantausekolah_folder_sekolah_school");
+            }
+        } catch (e) {}
+
+        // 3. Simpan cache & re-render seluruh tampilan seketika (0ms!)
+        this.saveToLocalStorage();
+        this.bindModules();
+        this.renderAllViews();
+
+        App.showToast(`🗑️ Sekolah "${cleanSchool}" dan foldernya berhasil dihapus total.`, "success");
+
+        // 4. Kirim request hapus total ke server di background
+        const currentUser = AuthService.getUser();
+        try {
+            await ApiService.post({
+                action: "delete_school",
+                schoolName: cleanSchool,
+                currentUserRole: currentUser ? currentUser.role : "Pengawas",
+                currentUserName: currentUser ? currentUser.nama : "Pengawas"
+            });
+            this.sync({ silent: true });
+        } catch (err) {
+            console.warn("Gagal hapus sekolah di server:", err);
+            App.showToast("Gagal menghapus sekolah di server.", "error");
         }
     },
 

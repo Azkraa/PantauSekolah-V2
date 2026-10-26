@@ -1659,6 +1659,81 @@ const ReportManager = {
     },
 
     /**
+     * Konfirmasi hapus total sekolah beserta seluruh folder Drive, dokumen laporan, dan akun penggunanya
+     */
+    async confirmDeleteEntireSchool(schoolName) {
+        const user = typeof AuthService !== "undefined" ? AuthService.getUser() : null;
+        if (!user || user.role !== "Pengawas") {
+            App.showToast("Hanya Pengawas yang berwenang menghapus total folder sekolah.", "warning");
+            return;
+        }
+
+        const target = (schoolName || this.selectedSchoolFolderSekolah || this.selectedSchoolState || "").trim();
+        if (!target || target.toLowerCase() === "dinas pendidikan") {
+            App.showToast("Pilih nama sekolah yang valid untuk dihapus.", "warning");
+            return;
+        }
+
+        const confirmed = await App.confirmModal({
+            title: "Hapus Total Folder & Data Sekolah",
+            message: `Apakah Anda yakin ingin menghapus TOTAL sekolah <strong>"${target}"</strong>?`,
+            subMessage: "⚠️ Folder arsip sekolah di Google Drive, seluruh berkas laporan supervisi, data kepatuhan di dashboard, serta akun kepala sekolah & guru yang terafiliasi akan dihapus permanen dan tidak akan muncul lagi di tampilan Pengawas.",
+            confirmText: "Ya, Hapus Total Sekolah",
+            confirmType: "danger",
+            icon: "fa-solid fa-triangle-exclamation"
+        });
+
+        if (confirmed) {
+            if (typeof LiveSync !== "undefined") {
+                await LiveSync.optimisticDeleteSchool(target);
+            }
+        }
+    },
+
+    openDeleteSchoolModal() {
+        const user = typeof AuthService !== "undefined" ? AuthService.getUser() : null;
+        if (!user || user.role !== "Pengawas") {
+            App.showToast("Hanya Pengawas yang berhak menghapus total folder sekolah.", "warning");
+            return;
+        }
+
+        const modal = document.getElementById("modal-delete-school");
+        const select = document.getElementById("select-delete-school");
+        if (!modal || !select) return;
+
+        let schools = [];
+        if (typeof DashboardManager !== "undefined" && typeof DashboardManager.getAllSchoolsList === "function") {
+            schools = DashboardManager.getAllSchoolsList();
+        } else if (typeof LiveSync !== "undefined" && LiveSync.state && Array.isArray(LiveSync.state.schools)) {
+            schools = LiveSync.state.schools.map(s => s.nama).filter(Boolean);
+        }
+
+        schools = Array.from(new Set(schools)).filter(s => s && s.toLowerCase() !== "dinas pendidikan" && s.toLowerCase() !== "dinas");
+
+        if (schools.length === 0) {
+            App.showToast("Tidak ada sekolah binaan yang terdaftar.", "info");
+            return;
+        }
+
+        select.innerHTML = schools.map(s => `<option value="${s}">🏫 ${s}</option>`).join("");
+        modal.classList.remove("hidden");
+    },
+
+    closeDeleteSchoolModal() {
+        const modal = document.getElementById("modal-delete-school");
+        if (modal) modal.classList.add("hidden");
+    },
+
+    async executeDeleteSelectedSchool() {
+        const select = document.getElementById("select-delete-school");
+        if (!select || !select.value) return;
+
+        const schoolName = select.value.trim();
+        this.closeDeleteSchoolModal();
+        this.confirmDeleteEntireSchool(schoolName);
+    },
+
+    /**
      * Konfirmasi hapus folder bawaan (Laporan Kepala Sekolah / Mingguan / Daring)
      */
     async confirmDeleteDefaultFolder(folderType, schoolName) {
@@ -2580,6 +2655,11 @@ const ReportManager = {
         const addKepsekFolderBtn = document.getElementById("folder-sekolah-add-kepsek-btn");
         if (addKepsekFolderBtn) {
             addKepsekFolderBtn.style.display = (isPengawas || isKepsek) ? "inline-flex" : "none";
+        }
+        const deleteSchoolBtn = document.getElementById("folder-sekolah-delete-school-btn");
+        if (deleteSchoolBtn) {
+            deleteSchoolBtn.style.display = isPengawas ? "inline-flex" : "none";
+            deleteSchoolBtn.onclick = () => this.confirmDeleteEntireSchool(targetSchool);
         }
 
         // 3. Switcher Sekolah (Hanya untuk Pengawas jika memiliki banyak sekolah binaan)
