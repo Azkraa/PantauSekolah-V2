@@ -77,6 +77,9 @@ function doPost(e) {
       case "delete_laporan":
         return handleDeleteLaporan(data);
 
+      case "update_laporan":
+        return handleUpdateLaporan(data);
+
       case "upload":
         return handleUploadFile(data);
 
@@ -1779,6 +1782,149 @@ function handleDeleteLaporan(data) {
   }
 
   return jsonResponse({ status: "error", message: "Data berkas laporan tidak ditemukan atau Anda tidak berwenang." });
+}
+
+function handleUpdateLaporan(data) {
+  const idLaporan = (data.idLaporan || "").toString().trim();
+  const targetSheetName = data.targetSheet;
+  const requesterRole = data.currentUserRole || "Guru";
+  const requesterName = (data.currentUserName || "").trim();
+  const requesterSchool = (data.currentUserSchool || "").trim();
+
+  if (!idLaporan) {
+    return jsonResponse({ status: "error", message: "ID Laporan tidak valid." });
+  }
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheetsToCheck = [];
+  if (targetSheetName && ss.getSheetByName(targetSheetName)) {
+    sheetsToCheck.push(ss.getSheetByName(targetSheetName));
+  }
+  [SHEET_LAPORAN_GURU, SHEET_LAPORAN_KEPSEK].forEach(name => {
+    const s = ss.getSheetByName(name);
+    if (s && !sheetsToCheck.includes(s)) sheetsToCheck.push(s);
+  });
+
+  const isPengawas = (requesterRole === "Pengawas");
+  let updatedItem = null;
+
+  for (let s = 0; s < sheetsToCheck.length; s++) {
+    const sheet = sheetsToCheck[s];
+    const rows = sheet.getDataRange().getValues();
+
+    for (let i = 1; i < rows.length; i++) {
+      const rowId = rows[i][0] ? rows[i][0].toString().trim() : "";
+      if (rowId === idLaporan) {
+        const itemUploader = (rows[i][2] || "").toString().trim();
+        const itemSchool = (rows[i][7] || "").toString().trim();
+
+        const isOwner = (requesterName && itemUploader.toLowerCase() === requesterName.toLowerCase());
+        const isSchoolKepsek = (requesterRole === "Kepala Sekolah" || requesterRole === "Kepsek") &&
+                               (requesterSchool && itemSchool.toLowerCase() === requesterSchool.toLowerCase());
+
+        if (!isPengawas && !isOwner && !isSchoolKepsek) {
+          return jsonResponse({ status: "error", message: "Anda tidak memiliki izin mengedit laporan ini." });
+        }
+
+        // 1. Kategori & JenisPelaporan (Folder)
+        if (data.kategori !== undefined && data.kategori !== null) {
+          rows[i][3] = data.kategori;
+        }
+        if (data.jenisPelaporan !== undefined && data.jenisPelaporan !== null) {
+          rows[i][8] = data.jenisPelaporan;
+        }
+        // 2. Poin Penting
+        if (data.poinPenting !== undefined && data.poinPenting !== null) {
+          rows[i][10] = data.poinPenting;
+        }
+
+        // 3. Optional: Ganti Berkas File
+        if (data.filebase64 && data.filename) {
+          try {
+            // Hapus file lama jika ada
+            const oldUrl = rows[i][4];
+            if (oldUrl) {
+              let oldFileId = "";
+              const matchD = oldUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+              const matchId = oldUrl.match(/id=([a-zA-Z0-9_-]+)/);
+              if (matchD && matchD[1]) oldFileId = matchD[1];
+              else if (matchId && matchId[1]) oldFileId = matchId[1];
+              if (oldFileId) {
+                try { DriveApp.getFileById(oldFileId).setTrashed(true); } catch (e) {}
+              }
+            }
+
+            // Simpan file baru
+            const schoolFolderObj = getOrCreateSchoolFolder(itemSchool);
+            const schoolFolder = DriveApp.getFolderById(schoolFolderObj.id);
+            let targetFolder = schoolFolder;
+            const isKep = sheet.getName() === SHEET_LAPORAN_KEPSEK;
+            const subFolderName = isKep ? "01_Laporan_Kepsek" : "02_Laporan_Guru";
+            const subFolders = schoolFolder.getFoldersByName(subFolderName);
+            if (subFolders.hasNext()) targetFolder = subFolders.next();
+
+            const reportFolderType = (data.jenisPelaporan || rows[i][8] || "").trim();
+            if (reportFolderType) {
+              const specFolders = targetFolder.getFoldersByName(reportFolderType);
+              if (specFolders.hasNext()) targetFolder = specFolders.next();
+            }
+
+            const contentType = data.mimeType || "application/octet-stream";
+            const base64Str = data.filebase64.indexOf(",") > -1 ? data.filebase64.split(",")[1] : data.filebase64;
+            const bytes = Utilities.base64Decode(base64Str);
+            const blob = Utilities.newBlob(bytes, contentType, data.filename);
+            const newFile = targetFolder.createFile(blob);
+            newFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+            rows[i][4] = newFile.getUrl();
+            rows[i][9] = data.filename;
+          } catch (eErr) {
+            console.error("Gagal mengganti berkas:", eErr);
+          }
+        }
+
+        // Tulis kembali baris ke sheet
+        sheet.getRange(i + 1, 1, 1, rows[i].length).setValues([rows[i]]);
+
+        updatedItem = {
+          id: rows[i][0],
+          tanggal: rows[i][1] ? Utilities.formatDate(new Date(rows[i][1]), "Asia/Jakarta", "dd/MM/yyyy") : "-",
+          nama: rows[i][2],
+          kategori: rows[i][3],
+          fileUrl: rows[i][4],
+          status: rows[i][5],
+          catatan: rows[i][6],
+          asalSekolah: rows[i][7],
+          jenisPelaporan: rows[i][8],
+          namaFile: rows[i][9] || "",
+          poinPenting: rows[i][10] || ""
+        };
+
+        recordAuditLog(
+          requesterName || "Pengguna",
+          data.currentUserUsername || "-",
+          requesterRole,
+          requesterSchool || "-",
+          "Perbarui Laporan",
+          "Memperbarui laporan " + idLaporan + " (" + (data.jenisPelaporan || rows[i][8]) + ")",
+          "Kategori: " + rows[i][3] + ", File: " + (rows[i][9] || "-")
+        );
+
+        break;
+      }
+    }
+    if (updatedItem) break;
+  }
+
+  if (updatedItem) {
+    return jsonResponse({
+      status: "success",
+      message: "Laporan berhasil diperbarui!",
+      data: updatedItem
+    });
+  } else {
+    return jsonResponse({ status: "error", message: "Laporan dengan ID " + idLaporan + " tidak ditemukan." });
+  }
 }
 
 // =============================================================================

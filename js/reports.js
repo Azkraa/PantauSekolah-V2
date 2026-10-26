@@ -9,7 +9,7 @@ const ReportManager = {
     selectedTypeState: "",
     activeSelectedId: "",
     activeTargetSheet: "",
-    selectedReportIds: { kepsek: new Set(), guru: new Set() },
+    selectedReportIds: { kepsek: new Set(), guru: new Set(), 'folder-sekolah': new Set() },
     currentViewMode: { kepsek: "folder", guru: "folder" },
     summaryFilters: {
         kepsek: { status: "all", search: "", teacher: "all" },
@@ -822,11 +822,11 @@ const ReportManager = {
                         <i class="fa-solid fa-chevron-right text-slate-300 group-hover:text-amber-600 text-xs sm:text-sm flex-shrink-0 mt-1"></i>
                     </div>
                     <div class="pt-2.5 border-t border-[#F0EBE1] flex items-center justify-between text-xs mt-1" onclick="event.stopPropagation()">
-                        ${f.driveFolderUrl ? `
+                        ${(isPengawas && f.driveFolderUrl) ? `
                             <a href="${f.driveFolderUrl}" target="_blank" class="text-blue-600 hover:text-blue-800 font-bold text-[11px] flex items-center gap-1.5 hover:underline">
                                 <i class="fa-brands fa-google-drive"></i> Buka Drive
                             </a>
-                        ` : '<span class="text-[10px] text-slate-400">Google Drive</span>'}
+                        ` : '<span class="text-[10px] text-slate-400 font-medium flex items-center gap-1"><i class="fa-solid fa-folder-closed text-slate-300"></i> Folder Aplikasi</span>'}
                         ${isPengawas ? `
                             <button onclick="ReportManager.confirmDeleteGuruFolder('${f.id}', '${safeFolderName}', '${safeTargetSchool}')" title="Hapus Folder" class="text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 border border-rose-200 transition-colors">
                                 <i class="fa-solid fa-trash-can text-[11px]"></i> Hapus
@@ -933,11 +933,11 @@ const ReportManager = {
                         <i class="fa-solid fa-chevron-right text-slate-300 group-hover:text-emerald-600 text-xs sm:text-sm flex-shrink-0 mt-1"></i>
                     </div>
                     <div class="pt-2.5 border-t border-[#F0EBE1] flex items-center justify-between text-xs mt-1" onclick="event.stopPropagation()">
-                        ${f.driveFolderUrl ? `
+                        ${(isPengawas && f.driveFolderUrl) ? `
                             <a href="${f.driveFolderUrl}" target="_blank" class="text-blue-600 hover:text-blue-800 font-bold text-[11px] flex items-center gap-1.5 hover:underline">
                                 <i class="fa-brands fa-google-drive"></i> Buka Drive
                             </a>
-                        ` : '<span class="text-[10px] text-slate-400">Google Drive</span>'}
+                        ` : '<span class="text-[10px] text-slate-400 font-medium flex items-center gap-1"><i class="fa-solid fa-folder-closed text-slate-300"></i> Folder Aplikasi</span>'}
                         ${(isPengawas || isKepsek) ? `
                             <button onclick="ReportManager.confirmDeleteGuruFolder('${f.id}', '${safeFolderName}', '${safeTargetSchool}')" title="Hapus Folder" class="text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 border border-rose-200 transition-colors">
                                 <i class="fa-solid fa-trash-can text-[11px]"></i> Hapus
@@ -1040,7 +1040,7 @@ const ReportManager = {
                         <div class="max-w-md mx-auto space-y-2">
                             <i class="fa-regular fa-folder-open text-3xl text-slate-300"></i>
                             <p class="text-xs">${emptyMsg}</p>
-                            ${driveUrl ? `
+                            ${(driveUrl && isPengawas) ? `
                                 <div class="pt-2">
                                     <a href="${driveUrl}" target="_blank" class="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-800 font-bold bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl text-xs transition-colors">
                                         <i class="fa-brands fa-google-drive"></i> Buka Folder di Google Drive
@@ -1066,7 +1066,9 @@ const ReportManager = {
             const itemSchool = (item.asalSekolah || "").trim().toLowerCase();
             const isOwner = currentName && itemUploader === currentName;
             const isSchoolKepsek = (currentRole === "Kepala Sekolah" || currentRole === "Kepsek") && currentSchool && itemSchool === currentSchool;
-            const canDelete = isPengawas || isOwner || isSchoolKepsek;
+            const canManage = isPengawas || isOwner || isSchoolKepsek;
+            const canDelete = canManage;
+            const canEdit = canManage;
             const isChecked = this.selectedReportIds[type] && this.selectedReportIds[type].has(item.id);
 
             tbody.innerHTML += `
@@ -1102,7 +1104,12 @@ const ReportManager = {
                         <div class="inline-flex items-center justify-center gap-1.5">
                             ${canVerify ? `
                                 <button onclick="ReportManager.openModalVerifikasi('${item.id}', '${item.nama}', '${item.status}', '${item.catatan}', '${targetSheet}')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1.5 rounded-xl shadow-sm text-xs transition-colors flex items-center gap-1">
-                                    <i class="fa-solid fa-file-circle-check"></i> Verifikasi
+                                    <i class="fa-solid fa-file-circle-check"></i> <span class="hidden md:inline">Verifikasi</span>
+                                </button>
+                            ` : ''}
+                            ${canEdit ? `
+                                <button onclick="ReportManager.openEditReportModal('${item.id}', '${targetSheet}')" title="Edit & Perbarui Laporan" class="bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold px-2.5 py-1.5 rounded-xl border border-amber-200 text-xs transition-colors flex items-center gap-1">
+                                    <i class="fa-solid fa-pen-to-square"></i> <span class="hidden md:inline">Edit</span>
                                 </button>
                             ` : ''}
                             ${canDelete ? `
@@ -1110,7 +1117,7 @@ const ReportManager = {
                                     <i class="fa-solid fa-trash-can"></i>
                                 </button>
                             ` : ''}
-                            ${!canVerify && !canDelete ? `<span class="text-slate-400 text-xs">-</span>` : ''}
+                            ${!canVerify && !canDelete && !canEdit ? `<span class="text-slate-400 text-xs">-</span>` : ''}
                         </div>
                     </td>
                 </tr>
@@ -1186,7 +1193,9 @@ const ReportManager = {
         }
 
         const count = ids.length;
-        const targetSheet = (type === 'kepsek') ? "Laporan_Kepsek" : "Laporan_Guru";
+        const targetSheet = (type === 'kepsek' || (type === 'folder-sekolah' && this.activeFolderSekolahType === 'kepsek')) 
+            ? "Laporan_Kepsek" 
+            : "Laporan_Guru";
 
         const confirmed = await App.confirmModal({
             title: "Hapus Berkas Laporan Terpilih",
@@ -1201,7 +1210,9 @@ const ReportManager = {
             this.clearSelection(type);
             if (typeof LiveSync !== "undefined") {
                 LiveSync.optimisticDeleteReport(ids, targetSheet);
-                if (this.selectedTypeState) {
+                if (this.activeFolderSekolahName && document.getElementById("wrapper-folder-sekolah-table") && !document.getElementById("wrapper-folder-sekolah-table").classList.contains("hidden")) {
+                    this.openFolderSekolahTable(this.activeFolderSekolahType, this.activeFolderSekolahName, this.activeFolderSekolahSchool);
+                } else if (this.selectedTypeState) {
                     this.openSubFolderTable(type, this.selectedTypeState);
                 }
                 this.renderSummaryPoinPenting(type);
@@ -1236,7 +1247,9 @@ const ReportManager = {
     deleteReport(idLaporan, targetSheet) {
         if (typeof LiveSync !== "undefined") {
             LiveSync.optimisticDeleteReport(idLaporan, targetSheet);
-            if (this.selectedTypeState) {
+            if (this.activeFolderSekolahName && document.getElementById("wrapper-folder-sekolah-table") && !document.getElementById("wrapper-folder-sekolah-table").classList.contains("hidden")) {
+                this.openFolderSekolahTable(this.activeFolderSekolahType, this.activeFolderSekolahName, this.activeFolderSekolahSchool);
+            } else if (this.selectedTypeState) {
                 this.openSubFolderTable(targetSheet === "Laporan_Kepsek" ? "kepsek" : "guru", this.selectedTypeState);
             }
             const type = (targetSheet === "Laporan_Kepsek") ? "kepsek" : "guru";
@@ -1902,9 +1915,12 @@ const ReportManager = {
             previewFilename.title = rawFilename;
         }
 
+        const currentUser = typeof AuthService !== "undefined" ? AuthService.getUser() : null;
+        const isPengawas = currentUser && currentUser.role === "Pengawas";
+
         const extLink = document.getElementById("modal-file-link-ext");
         const fileLink = document.getElementById("modal-file-link");
-        if (fileUrl) {
+        if (fileUrl && isPengawas) {
             if (extLink) {
                 extLink.href = fileUrl;
                 extLink.classList.remove("hidden");
@@ -1919,8 +1935,13 @@ const ReportManager = {
         }
 
         const fallbackDriveBtn = document.getElementById("modal-fallback-drive-btn");
-        if (fallbackDriveBtn && fileUrl) {
-            fallbackDriveBtn.href = fileUrl;
+        if (fallbackDriveBtn) {
+            if (fileUrl && isPengawas) {
+                fallbackDriveBtn.href = fileUrl;
+                fallbackDriveBtn.classList.remove("hidden");
+            } else {
+                fallbackDriveBtn.classList.add("hidden");
+            }
         }
 
         // Konfigurasi Frame & Pratinjau Dokumen
@@ -2038,7 +2059,9 @@ const ReportManager = {
 
         if (typeof LiveSync !== "undefined") {
             LiveSync.optimisticVerifyReport(idLaporan, statusVerifikasi, catatanVerifikasi, targetSheet);
-            if (this.selectedTypeState) {
+            if (this.activeFolderSekolahName && document.getElementById("wrapper-folder-sekolah-table") && !document.getElementById("wrapper-folder-sekolah-table").classList.contains("hidden")) {
+                this.openFolderSekolahTable(this.activeFolderSekolahType, this.activeFolderSekolahName, this.activeFolderSekolahSchool);
+            } else if (this.selectedTypeState) {
                 this.openSubFolderTable(targetSheet === "Laporan_Kepsek" ? "kepsek" : "guru", this.selectedTypeState);
             }
             const type = (targetSheet === "Laporan_Kepsek") ? "kepsek" : "guru";
@@ -2504,12 +2527,19 @@ const ReportManager = {
         if (titleEl) titleEl.innerText = `Folder Dokumen: ${targetSchool}`;
         if (badgeEl) badgeEl.innerText = targetSchool;
         if (rootDriveBtn) {
-            if (schoolDriveUrl && schoolDriveUrl !== "#" && schoolDriveUrl !== "undefined") {
-                rootDriveBtn.href = schoolDriveUrl;
-                rootDriveBtn.classList.remove("opacity-50", "pointer-events-none");
+            if (!isPengawas) {
+                rootDriveBtn.classList.add("hidden");
+                rootDriveBtn.style.display = "none";
             } else {
-                rootDriveBtn.href = "#";
-                rootDriveBtn.classList.add("opacity-50", "pointer-events-none");
+                rootDriveBtn.classList.remove("hidden");
+                rootDriveBtn.style.display = "inline-flex";
+                if (schoolDriveUrl && schoolDriveUrl !== "#" && schoolDriveUrl !== "undefined") {
+                    rootDriveBtn.href = schoolDriveUrl;
+                    rootDriveBtn.classList.remove("opacity-50", "pointer-events-none");
+                } else {
+                    rootDriveBtn.href = "#";
+                    rootDriveBtn.classList.add("opacity-50", "pointer-events-none");
+                }
             }
         }
         if (addFolderBtn) {
@@ -2601,25 +2631,29 @@ const ReportManager = {
                 const safeFldName = f.namaFolder.replace(/'/g, "\\'");
 
                 htmlGuru += `
-                    <div class="bg-white p-5 rounded-2xl border border-[#E8E2D5] shadow-xs hover:shadow-md transition-all flex flex-col justify-between gap-3 overflow-hidden">
-                        <div class="flex items-start gap-3.5 w-full min-w-0">
-                            <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl font-bold border border-emerald-100 flex-shrink-0">
-                                <i class="fa-solid fa-folder-open"></i>
+                    <div onclick="ReportManager.openFolderSekolahTable('guru', '${safeFldName}', '${safeTargetSchool}')"
+                        class="bg-white p-5 rounded-2xl border border-[#E8E2D5] shadow-xs hover:shadow-md hover:border-emerald-500 transition-all cursor-pointer group flex flex-col justify-between gap-3 overflow-hidden">
+                        <div class="flex items-start justify-between gap-3 w-full min-w-0">
+                            <div class="flex items-start gap-3.5 min-w-0 flex-1">
+                                <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl font-bold border border-emerald-100 group-hover:bg-emerald-600 group-hover:text-white transition-all flex-shrink-0">
+                                    <i class="fa-solid fa-folder-open"></i>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <h4 class="font-bold text-slate-800 text-sm group-hover:text-emerald-700 transition-colors leading-snug break-words line-clamp-2" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word;" title="${f.namaFolder}">${f.namaFolder}</h4>
+                                    <p class="text-[11px] text-slate-400 mt-0.5">Folder Dokumen Guru</p>
+                                    <span class="inline-block mt-1.5 text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md border border-emerald-100">${countCustom} Berkas</span>
+                                </div>
                             </div>
-                            <div class="min-w-0 flex-1">
-                                <h4 class="font-bold text-slate-800 text-sm leading-snug break-words line-clamp-2" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word;" title="${f.namaFolder}">${f.namaFolder}</h4>
-                                <p class="text-[11px] text-slate-400 mt-0.5">Folder Dokumen Guru</p>
-                                <span class="inline-block mt-1.5 text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md border border-emerald-100">${countCustom} Berkas</span>
-                            </div>
+                            <i class="fa-solid fa-chevron-right text-slate-300 group-hover:text-emerald-600 text-xs flex-shrink-0 mt-1"></i>
                         </div>
-                        <div class="pt-3 border-t border-[#F0EBE1] flex items-center justify-between text-xs">
-                            ${f.driveFolderUrl ? `
+                        <div class="pt-3 border-t border-[#F0EBE1] flex items-center justify-between text-xs" onclick="event.stopPropagation()">
+                            ${(isPengawas && f.driveFolderUrl) ? `
                                 <a href="${f.driveFolderUrl}" target="_blank" class="text-blue-600 hover:text-blue-800 font-bold text-[11px] flex items-center gap-1.5 hover:underline">
                                     <i class="fa-brands fa-google-drive"></i> Buka Drive
                                 </a>
-                            ` : '<span class="text-[10px] text-slate-400 font-medium">Google Drive</span>'}
+                            ` : '<span class="text-[10px] text-slate-400 font-medium flex items-center gap-1"><i class="fa-solid fa-folder-closed text-slate-300"></i> Buka di Aplikasi</span>'}
                             ${(isPengawas || isKepsek) ? `
-                                <button onclick="ReportManager.confirmDeleteGuruFolder('${f.id}', '${safeFldName}', '${safeTargetSchool}')" title="Hapus Folder" class="text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 border border-rose-200 transition-colors">
+                                <button onclick="event.stopPropagation(); ReportManager.confirmDeleteGuruFolder('${f.id}', '${safeFldName}', '${safeTargetSchool}')" title="Hapus Folder" class="text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 border border-rose-200 transition-colors">
                                     <i class="fa-solid fa-trash-can text-[11px]"></i> Hapus
                                 </button>
                             ` : ''}
@@ -2706,25 +2740,29 @@ const ReportManager = {
                 const safeFldName = f.namaFolder.replace(/'/g, "\\'");
 
                 htmlKepsek += `
-                    <div class="bg-white p-5 rounded-2xl border border-[#E8E2D5] shadow-xs hover:shadow-md hover:border-amber-400 transition-all flex flex-col justify-between gap-3 overflow-hidden">
-                        <div class="flex items-start gap-3.5 w-full min-w-0">
-                            <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl font-bold border border-amber-100 flex-shrink-0">
-                                <i class="fa-solid fa-folder-closed"></i>
+                    <div onclick="ReportManager.openFolderSekolahTable('kepsek', '${safeFldName}', '${safeTargetSchool}')"
+                        class="bg-white p-5 rounded-2xl border border-[#E8E2D5] shadow-xs hover:shadow-md hover:border-amber-500 transition-all cursor-pointer group flex flex-col justify-between gap-3 overflow-hidden">
+                        <div class="flex items-start justify-between gap-3 w-full min-w-0">
+                            <div class="flex items-start gap-3.5 min-w-0 flex-1">
+                                <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl font-bold border border-amber-100 group-hover:bg-amber-600 group-hover:text-white transition-all flex-shrink-0">
+                                    <i class="fa-solid fa-folder-closed"></i>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <h4 class="font-bold text-slate-800 text-sm group-hover:text-amber-700 transition-colors leading-snug break-words line-clamp-2" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word;" title="${f.namaFolder}">${f.namaFolder}</h4>
+                                    <p class="text-[11px] text-slate-400 mt-0.5">Folder Khusus Kepala Sekolah</p>
+                                    <span class="inline-block mt-1.5 text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-800 rounded-md border border-amber-100">${countCustom} Berkas</span>
+                                </div>
                             </div>
-                            <div class="min-w-0 flex-1">
-                                <h4 class="font-bold text-slate-800 text-sm leading-snug break-words line-clamp-2" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word;" title="${f.namaFolder}">${f.namaFolder}</h4>
-                                <p class="text-[11px] text-slate-400 mt-0.5">Folder Khusus Kepala Sekolah</p>
-                                <span class="inline-block mt-1.5 text-[10px] font-bold px-2 py-0.5 bg-amber-50 text-amber-800 rounded-md border border-amber-100">${countCustom} Berkas</span>
-                            </div>
+                            <i class="fa-solid fa-chevron-right text-slate-300 group-hover:text-amber-600 text-xs flex-shrink-0 mt-1"></i>
                         </div>
-                        <div class="pt-3 border-t border-[#F0EBE1] flex items-center justify-between text-xs">
-                            ${f.driveFolderUrl ? `
+                        <div class="pt-3 border-t border-[#F0EBE1] flex items-center justify-between text-xs" onclick="event.stopPropagation()">
+                            ${(isPengawas && f.driveFolderUrl) ? `
                                 <a href="${f.driveFolderUrl}" target="_blank" class="text-blue-600 hover:text-blue-800 font-bold text-[11px] flex items-center gap-1.5 hover:underline">
                                     <i class="fa-brands fa-google-drive"></i> Buka Drive
                                 </a>
-                            ` : '<span class="text-[10px] text-slate-400 font-medium">Google Drive</span>'}
+                            ` : '<span class="text-[10px] text-slate-400 font-medium flex items-center gap-1"><i class="fa-solid fa-folder-closed text-slate-300"></i> Buka di Aplikasi</span>'}
                             ${isPengawas ? `
-                                <button onclick="ReportManager.confirmDeleteGuruFolder('${f.id}', '${safeFldName}', '${safeTargetSchool}')" title="Hapus Folder Khusus Kepala Sekolah" class="text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 border border-rose-200 transition-colors">
+                                <button onclick="event.stopPropagation(); ReportManager.confirmDeleteGuruFolder('${f.id}', '${safeFldName}', '${safeTargetSchool}')" title="Hapus Folder Khusus Kepala Sekolah" class="text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 border border-rose-200 transition-colors">
                                     <i class="fa-solid fa-trash-can text-[11px]"></i> Hapus
                                 </button>
                             ` : `
@@ -2748,6 +2786,375 @@ const ReportManager = {
             }
 
             gridKepsek.innerHTML = htmlKepsek;
+        }
+    },
+
+    /**
+     * Membuka subfolder dokumen sekolah di dalam aplikasi (Khusus tampilan Folder Dokumen Sekolah)
+     */
+    openFolderSekolahTable(type, folderName, schoolName) {
+        this.activeFolderSekolahType = type; // 'guru' | 'kepsek'
+        this.activeFolderSekolahName = folderName;
+        this.activeFolderSekolahSchool = schoolName || this.selectedSchoolFolderSekolah || this.selectedSchoolState || "";
+
+        const contentWrapper = document.getElementById("wrapper-folder-sekolah-content");
+        const tableWrapper = document.getElementById("wrapper-folder-sekolah-table");
+        if (contentWrapper) contentWrapper.classList.add("hidden");
+        if (tableWrapper) tableWrapper.classList.remove("hidden");
+
+        const currentUser = typeof AuthService !== "undefined" ? AuthService.getUser() : null;
+        const currentRole = currentUser ? currentUser.role : "";
+        const currentName = currentUser ? (currentUser.nama || "").trim().toLowerCase() : "";
+        const currentSchool = currentUser ? (currentUser.asal_sekolah || "").trim().toLowerCase() : "";
+        const isPengawas = currentRole === "Pengawas";
+        const isKepsek = currentRole === "Kepala Sekolah" || currentRole === "Kepsek";
+        const isGuru = currentRole === "Guru";
+
+        const titleEl = document.getElementById("table-folder-sekolah-title");
+        const badgeEl = document.getElementById("table-folder-sekolah-badge");
+        const subTitleEl = document.getElementById("table-folder-sekolah-subtitle");
+        const driveBtn = document.getElementById("btn-folder-sekolah-table-drive");
+
+        if (titleEl) {
+            titleEl.innerText = `${folderName}`;
+        }
+        if (badgeEl) {
+            badgeEl.innerText = type === "kepsek" ? "Berkas Kepala Sekolah" : "Berkas Guru";
+            badgeEl.className = type === "kepsek" 
+                ? "px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200"
+                : "px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100";
+        }
+        if (subTitleEl) {
+            subTitleEl.innerText = `${this.activeFolderSekolahSchool} • Kelola berkas laporan`;
+        }
+
+        // HANYA Pengawas yang dapat melihat tombol Drive!
+        const allFolders = (typeof LiveSync !== "undefined" && LiveSync.state.folders)
+            ? LiveSync.state.folders
+            : (typeof DriveManager !== "undefined" && DriveManager.cachedFolders ? DriveManager.cachedFolders : []);
+        const matchedFolder = allFolders.find(f => {
+            const mName = (f.namaFolder || "").trim().toLowerCase() === folderName.trim().toLowerCase();
+            return mName && ReportManager.isFolderForSchool(f, this.activeFolderSekolahSchool);
+        });
+
+        if (driveBtn) {
+            if (isPengawas && matchedFolder && matchedFolder.driveFolderUrl) {
+                driveBtn.href = matchedFolder.driveFolderUrl;
+                driveBtn.classList.remove("hidden");
+            } else {
+                driveBtn.classList.add("hidden");
+            }
+        }
+
+        const tbody = document.getElementById("table-body-folder-sekolah");
+        if (!tbody) return;
+
+        const rawData = (type === "kepsek") 
+            ? ((typeof DashboardManager !== "undefined" && DashboardManager.cachedData.reportsKepsek) ? DashboardManager.cachedData.reportsKepsek : [])
+            : ((typeof DashboardManager !== "undefined" && DashboardManager.cachedData.reportsGuru) ? DashboardManager.cachedData.reportsGuru : []);
+
+        const targetSheet = (type === "kepsek") ? "Laporan_Kepsek" : "Laporan_Guru";
+
+        const filtered = rawData.filter(x => {
+            const matchSchool = (x.asalSekolah || "").toLowerCase() === (this.activeFolderSekolahSchool || "").toLowerCase();
+            if (!matchSchool) return false;
+
+            // Jika Guru: HANYA tampilkan berkas miliknya sendiri
+            if (isGuru && type === "guru") {
+                const uploaderName = (x.nama || "").trim().toLowerCase();
+                if (uploaderName !== currentName) return false;
+            }
+
+            const repType = (x.jenisPelaporan || x.kategori || '').toLowerCase();
+            const targetName = folderName.toLowerCase();
+            return repType.includes(targetName);
+        });
+
+        if (filtered.length === 0) {
+            const emptyMsg = (isGuru && type === "guru")
+                ? `Anda belum mengunggah berkas untuk folder <strong>"${folderName}"</strong>.`
+                : `Belum ada berkas untuk folder <strong>"${folderName}"</strong> di sekolah ini.`;
+
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" class="p-8 text-center text-slate-400 font-medium">
+                        <div class="max-w-md mx-auto space-y-2">
+                            <i class="fa-regular fa-folder-open text-3xl text-slate-300"></i>
+                            <p class="text-xs">${emptyMsg}</p>
+                            <p class="text-[11px] text-slate-400">Klik tombol '+ Unggah ke Folder Ini' di atas untuk menambahkan berkas baru.</p>
+                        </div>
+                    </td>
+                </tr>`;
+            this.clearSelection('folder-sekolah');
+            return;
+        }
+
+        tbody.innerHTML = "";
+        filtered.forEach(item => {
+            const itemUploader = (item.nama || "").trim().toLowerCase();
+            const itemSchool = (item.asalSekolah || "").trim().toLowerCase();
+            const isOwner = currentName && itemUploader === currentName;
+            const isSchoolKepsek = (currentRole === "Kepala Sekolah" || currentRole === "Kepsek") && currentSchool && itemSchool === currentSchool;
+            const canManage = isPengawas || isOwner || isSchoolKepsek;
+            const canDelete = canManage;
+            const canEdit = canManage;
+            const canVerify = isPengawas || currentRole === "Kepala Sekolah" || currentRole === "Kepsek";
+            const isChecked = this.selectedReportIds['folder-sekolah'] && this.selectedReportIds['folder-sekolah'].has(item.id);
+
+            tbody.innerHTML += `
+                <tr class="hover:bg-[#FAF7F0] transition-colors border-b border-[#F0EBE1] ${isChecked ? 'bg-blue-50/40' : ''}">
+                    <td class="p-3.5 text-center whitespace-nowrap">
+                        <input type="checkbox" class="report-row-cb-folder-sekolah w-4 h-4 rounded text-blue-600 border-[#D5CEBF] focus:ring-blue-500 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                            value="${item.id}"
+                            ${!canDelete ? 'disabled title="Anda tidak memiliki izin menghapus berkas ini"' : ''}
+                            ${isChecked ? 'checked' : ''}
+                            onchange="ReportManager.onRowCheckboxChange('folder-sekolah', this, '${item.id}')">
+                    </td>
+                    <td class="p-3.5 whitespace-nowrap">
+                        <p class="font-bold text-slate-800 font-mono text-xs">${item.id}</p>
+                        <p class="text-[10px] text-slate-400 font-medium">${item.tanggal}</p>
+                    </td>
+                    <td class="p-3.5 font-bold text-slate-800 whitespace-nowrap">${item.nama}</td>
+                    <td class="p-3.5 text-slate-700 min-w-[200px] max-w-[340px]">
+                        <div class="font-bold text-slate-800 text-xs">${item.kategori}</div>
+                        <div class="text-[11px] text-slate-600 mt-1 line-clamp-2 leading-relaxed bg-amber-50/70 p-1.5 rounded-lg border border-amber-200/80" title="${ReportManager.getPoinPenting(item).replace(/"/g, '&quot;')}">
+                            <span class="font-semibold text-amber-800"><i class="fa-solid fa-list-check text-amber-600 text-[10px] mr-1"></i>Poin:</span> ${ReportManager.getPoinPenting(item).replace(/\n/g, ' ')}
+                        </div>
+                    </td>
+                    <td class="p-3.5 text-center whitespace-nowrap">
+                        <a href="${item.fileUrl}" target="_blank" class="inline-flex items-center gap-1.5 text-slate-700 hover:text-blue-700 font-bold bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 px-2.5 py-1 rounded-lg text-xs transition-colors shadow-2xs">
+                            ${ReportManager.getFileIcon(item.fileUrl, item.namaFile || item.filename, item.kategori)} <span>Buka Berkas</span>
+                        </a>
+                    </td>
+                    <td class="p-3.5 text-center whitespace-nowrap">${DashboardManager.getStatusBadge(item.status)}</td>
+                    <td class="p-3.5 text-slate-600 text-xs max-w-[200px] truncate" title="${item.catatan && item.catatan !== '-' ? item.catatan : ''}">
+                        ${item.catatan && item.catatan !== '-' && item.catatan !== 'Belum ada catatan' ? `<span class="italic text-slate-700 font-medium">"${item.catatan}"</span>` : '<span class="text-slate-400">-</span>'}
+                    </td>
+                    <td class="p-3.5 text-center whitespace-nowrap">
+                        <div class="inline-flex items-center justify-center gap-1.5">
+                            ${canVerify ? `
+                                <button onclick="ReportManager.openModalVerifikasi('${item.id}', '${item.nama}', '${item.status}', '${item.catatan}', '${targetSheet}')" title="Verifikasi Laporan" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-2.5 py-1.5 rounded-xl shadow-sm text-xs transition-colors flex items-center gap-1">
+                                    <i class="fa-solid fa-file-circle-check"></i> <span class="hidden md:inline">Verifikasi</span>
+                                </button>
+                            ` : ''}
+                            ${canEdit ? `
+                                <button onclick="ReportManager.openEditReportModal('${item.id}', '${targetSheet}')" title="Edit & Perbarui Laporan" class="bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold px-2.5 py-1.5 rounded-xl border border-amber-200 text-xs transition-colors flex items-center gap-1">
+                                    <i class="fa-solid fa-pen-to-square"></i> <span class="hidden md:inline">Edit</span>
+                                </button>
+                            ` : ''}
+                            ${canDelete ? `
+                                <button onclick="ReportManager.confirmDeleteReport('${item.id}', '${item.nama}', '${targetSheet}')" title="Hapus Laporan" class="bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold px-2.5 py-1.5 rounded-xl border border-rose-200 text-xs transition-colors">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            ` : ''}
+                            ${!canVerify && !canManage ? `<span class="text-slate-400 text-xs">-</span>` : ''}
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+
+        this.updateBulkBar('folder-sekolah');
+    },
+
+    backToFolderSekolahGrid() {
+        const contentWrapper = document.getElementById("wrapper-folder-sekolah-content");
+        const tableWrapper = document.getElementById("wrapper-folder-sekolah-table");
+        if (tableWrapper) tableWrapper.classList.add("hidden");
+        if (contentWrapper) contentWrapper.classList.remove("hidden");
+        this.renderFolderSekolahView(this.activeFolderSekolahSchool || this.selectedSchoolFolderSekolah);
+    },
+
+    uploadToCurrentFolderSekolah() {
+        if (typeof App !== "undefined") {
+            App.switchTab('upload');
+            setTimeout(() => {
+                const selFolder = document.getElementById("sub-folder-tujuan");
+                if (selFolder && this.activeFolderSekolahName) {
+                    selFolder.value = this.activeFolderSekolahName;
+                }
+            }, 100);
+        }
+    },
+
+    openEditReportModal(reportId, targetSheet) {
+        const modal = document.getElementById("modal-edit-report");
+        if (!modal) return;
+
+        const rawData = (targetSheet === "Laporan_Kepsek") 
+            ? ((typeof DashboardManager !== "undefined" && DashboardManager.cachedData.reportsKepsek) ? DashboardManager.cachedData.reportsKepsek : [])
+            : ((typeof DashboardManager !== "undefined" && DashboardManager.cachedData.reportsGuru) ? DashboardManager.cachedData.reportsGuru : []);
+
+        let item = rawData.find(x => x.id && x.id.toString().trim() === reportId.toString().trim());
+        if (!item && typeof DashboardManager !== "undefined") {
+            item = (DashboardManager.cachedData.reportsKepsek || []).find(x => x.id && x.id.toString().trim() === reportId.toString().trim())
+                || (DashboardManager.cachedData.reportsGuru || []).find(x => x.id && x.id.toString().trim() === reportId.toString().trim());
+        }
+
+        if (!item) {
+            App.showToast("Laporan tidak ditemukan.", "error");
+            return;
+        }
+
+        const currentUser = typeof AuthService !== "undefined" ? AuthService.getUser() : null;
+        const currentRole = currentUser ? currentUser.role : "";
+        const currentName = currentUser ? (currentUser.nama || "").trim().toLowerCase() : "";
+        const currentSchool = currentUser ? (currentUser.asal_sekolah || "").trim().toLowerCase() : "";
+        const isPengawas = currentRole === "Pengawas";
+        const isOwner = currentName && (item.nama || "").trim().toLowerCase() === currentName;
+        const isSchoolKepsek = (currentRole === "Kepala Sekolah" || currentRole === "Kepsek") && currentSchool && (item.asalSekolah || "").trim().toLowerCase() === currentSchool;
+
+        if (!isPengawas && !isOwner && !isSchoolKepsek) {
+            App.showToast("Anda tidak memiliki izin mengedit laporan ini.", "error");
+            return;
+        }
+
+        document.getElementById("edit-report-id").value = item.id;
+        document.getElementById("edit-report-targetsheet").value = targetSheet || (item.id.startsWith("LPK") ? "Laporan_Kepsek" : "Laporan_Guru");
+        document.getElementById("edit-report-id-display").innerText = item.id;
+        document.getElementById("edit-report-meta-display").innerText = `${item.nama} • ${item.asalSekolah}`;
+        document.getElementById("edit-report-kategori").value = item.kategori || "";
+        document.getElementById("edit-report-poin").value = this.getPoinPenting(item);
+
+        const currentFileBadge = document.getElementById("edit-report-current-file-badge");
+        if (currentFileBadge) {
+            currentFileBadge.innerHTML = item.namaFile 
+                ? `Berkas: <a href="${item.fileUrl}" target="_blank" class="text-blue-600 hover:underline font-bold">${item.namaFile}</a>`
+                : `<a href="${item.fileUrl}" target="_blank" class="text-blue-600 hover:underline font-bold">Buka Berkas Saat Ini</a>`;
+        }
+
+        const fileInput = document.getElementById("edit-report-file-input");
+        if (fileInput) fileInput.value = "";
+
+        // Populate folder dropdown
+        const folderSel = document.getElementById("edit-report-folder");
+        if (folderSel) {
+            const allFolders = (typeof LiveSync !== "undefined" && LiveSync.state.folders)
+                ? LiveSync.state.folders
+                : (typeof DriveManager !== "undefined" && DriveManager.cachedFolders ? DriveManager.cachedFolders : []);
+            
+            const isKep = (targetSheet === "Laporan_Kepsek" || item.id.startsWith("LPK"));
+            const schoolFolders = allFolders.filter(f => {
+                if (!f.namaFolder || f.namaFolder.startsWith("__DELETED__:") || (f.id && f.id.toString().startsWith("DEL-"))) return false;
+                const matchSchool = ReportManager.isFolderForSchool(f, item.asalSekolah);
+                const matchSub = isKep ? f.subCategory === "kepsek" : (!f.subCategory || f.subCategory === "guru" || f.subCategory === "root");
+                return matchSchool && matchSub;
+            });
+
+            const uniqueNames = new Set();
+            let optsHtml = "";
+            const currentFld = (item.jenisPelaporan || "").trim();
+            if (currentFld) {
+                uniqueNames.add(currentFld.toLowerCase());
+                optsHtml += `<option value="${currentFld}" selected>${currentFld}</option>`;
+            }
+
+            schoolFolders.forEach(f => {
+                const fn = (f.namaFolder || "").trim();
+                if (fn && !uniqueNames.has(fn.toLowerCase())) {
+                    uniqueNames.add(fn.toLowerCase());
+                    optsHtml += `<option value="${fn}">${fn}</option>`;
+                }
+            });
+
+            if (!optsHtml) {
+                optsHtml = `<option value="${currentFld || 'Umum'}">${currentFld || 'Umum'}</option>`;
+            }
+            folderSel.innerHTML = optsHtml;
+        }
+
+        modal.classList.remove("hidden");
+    },
+
+    closeEditReportModal() {
+        const modal = document.getElementById("modal-edit-report");
+        if (modal) modal.classList.add("hidden");
+    },
+
+    async submitEditReport(e) {
+        if (e && e.preventDefault) e.preventDefault();
+
+        const reportId = document.getElementById("edit-report-id").value;
+        const targetSheet = document.getElementById("edit-report-targetsheet").value;
+        const folder = document.getElementById("edit-report-folder").value.trim();
+        const kategori = document.getElementById("edit-report-kategori").value.trim();
+        const poinPenting = document.getElementById("edit-report-poin").value.trim();
+        const fileInput = document.getElementById("edit-report-file-input");
+
+        const btnSubmit = document.getElementById("btn-submit-edit-report");
+        if (btnSubmit) {
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Menyimpan...`;
+        }
+
+        const executeUpdate = async (filebase64, filename, mimeType) => {
+            const updatedData = {
+                id: reportId,
+                jenisPelaporan: folder,
+                kategori: kategori,
+                poinPenting: poinPenting
+            };
+            if (filebase64 && filename) {
+                updatedData.filebase64 = filebase64;
+                updatedData.filename = filename;
+                updatedData.mimeType = mimeType;
+                updatedData.namaFile = filename;
+            }
+
+            if (typeof LiveSync !== "undefined") {
+                await LiveSync.optimisticUpdateReport(updatedData, targetSheet);
+            } else {
+                const currentUser = typeof AuthService !== "undefined" ? AuthService.getUser() : null;
+                await ApiService.post({
+                    action: "update_laporan",
+                    idLaporan: reportId,
+                    targetSheet: targetSheet,
+                    ...updatedData,
+                    currentUserRole: currentUser ? currentUser.role : "Guru",
+                    currentUserName: currentUser ? currentUser.nama : "",
+                    currentUserUsername: currentUser ? currentUser.username : "",
+                    currentUserSchool: currentUser ? currentUser.asal_sekolah : ""
+                });
+                App.showToast("Laporan berhasil diperbarui.", "success");
+            }
+
+            // Refresh tampilan tabel yang sedang aktif
+            if (this.activeFolderSekolahName && document.getElementById("wrapper-folder-sekolah-table") && !document.getElementById("wrapper-folder-sekolah-table").classList.contains("hidden")) {
+                this.openFolderSekolahTable(this.activeFolderSekolahType, this.activeFolderSekolahName, this.activeFolderSekolahSchool);
+            } else if (this.selectedTypeState) {
+                this.openSubFolderTable(targetSheet === "Laporan_Kepsek" ? "kepsek" : "guru", this.selectedTypeState);
+            }
+
+            this.closeEditReportModal();
+            if (btnSubmit) {
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = `<i class="fa-solid fa-floppy-disk"></i> Simpan Perubahan`;
+            }
+        };
+
+        if (fileInput && fileInput.files && fileInput.files[0]) {
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            reader.onload = async () => {
+                const ext = file.name.split('.').pop().toLowerCase();
+                const mimeMap = {
+                    'pdf': 'application/pdf',
+                    'doc': 'application/msword',
+                    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'xls': 'application/vnd.ms-excel',
+                    'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'csv': 'text/csv',
+                    'jpg': 'image/jpeg',
+                    'jpeg': 'image/jpeg',
+                    'png': 'image/png',
+                    'webp': 'image/webp'
+                };
+                const mimeType = mimeMap[ext] || file.type || 'application/octet-stream';
+                await executeUpdate(reader.result, file.name, mimeType);
+            };
+            reader.readAsDataURL(file);
+        } else {
+            await executeUpdate();
         }
     }
 };

@@ -553,6 +553,67 @@ const LiveSync = {
     },
 
     /**
+     * Update laporan secara instan di UI lalu kirim pembaruan ke server
+     */
+    async optimisticUpdateReport(updatedReport, targetSheet) {
+        if (!updatedReport || !updatedReport.id) return;
+        const repId = updatedReport.id.toString().trim();
+
+        // 1. Update di array lokal seketika
+        const updateInList = (list) => {
+            return list.map(item => {
+                if (item && item.id && item.id.toString().trim() === repId) {
+                    return { ...item, ...updatedReport };
+                }
+                return item;
+            });
+        };
+
+        this.state.reportsKepsek = updateInList(this.state.reportsKepsek);
+        this.state.reportsGuru = updateInList(this.state.reportsGuru);
+        this.state.allActivity = updateInList(this.state.allActivity);
+
+        // 2. Simpan cache & render
+        this.saveToLocalStorage();
+        this.renderAllViews();
+        App.showToast("Laporan berhasil diperbarui.", "success");
+
+        // 3. Kirim ke server di background
+        const currentUser = typeof AuthService !== "undefined" ? AuthService.getUser() : null;
+        try {
+            const payload = {
+                action: "update_laporan",
+                idLaporan: repId,
+                targetSheet: targetSheet,
+                kategori: updatedReport.kategori,
+                jenisPelaporan: updatedReport.jenisPelaporan,
+                poinPenting: updatedReport.poinPenting,
+                filebase64: updatedReport.filebase64 || undefined,
+                filename: updatedReport.filename || undefined,
+                mimeType: updatedReport.mimeType || undefined,
+                currentUserRole: currentUser ? currentUser.role : "Guru",
+                currentUserName: currentUser ? currentUser.nama : "",
+                currentUserUsername: currentUser ? currentUser.username : "",
+                currentUserSchool: currentUser ? currentUser.asal_sekolah : ""
+            };
+
+            const res = await ApiService.post(payload);
+            if (res && res.status === "success" && res.data) {
+                this.state.reportsKepsek = updateInList(this.state.reportsKepsek.map(x => x.id === repId ? { ...x, ...res.data } : x));
+                this.state.reportsGuru = updateInList(this.state.reportsGuru.map(x => x.id === repId ? { ...x, ...res.data } : x));
+                this.saveToLocalStorage();
+                this.renderAllViews();
+            } else if (res && res.status === "error") {
+                App.showToast(res.message || "Gagal memperbarui laporan di server.", "error");
+            }
+            this.sync({ silent: true });
+        } catch (err) {
+            console.error("Error update_laporan:", err);
+            App.showToast("Gagal memperbarui laporan di server.", "error");
+        }
+    },
+
+    /**
      * Hapus laporan secara instan di UI lalu hapus di server (Mendukung single ID maupun batch array IDs)
      */
     async optimisticDeleteReport(idOrIds, targetSheet) {

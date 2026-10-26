@@ -173,7 +173,7 @@
                                 </p>
                             </div>
                             <a id="modal-fallback-drive-btn" href="#" target="_blank" rel="noopener noreferrer"
-                                class="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all">
+                                class="hidden inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all">
                                 <i class="fa-brands fa-google-drive"></i> Buka Berkas di Google Drive
                             </a>
                         </div>
@@ -384,7 +384,95 @@
     </div>
 
     <!-- ==================================================================== -->
-    <!-- MODAL EDIT PENGGUNA                                                  -->
+    <!-- MODAL EDIT & PERBARUI LAPORAN                                        -->
+    <!-- ==================================================================== -->
+    <div id="modal-edit-report"
+        class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center hidden p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-3xl p-5 sm:p-7 w-full max-w-lg shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto border border-[#E8E2D5]">
+            <div class="flex justify-between items-center border-b border-[#F0EBE1] pb-3">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center text-lg font-bold border border-amber-100">
+                        <i class="fa-solid fa-file-pen"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-800 text-base sm:text-lg leading-tight">
+                            Edit & Perbarui Laporan
+                        </h3>
+                        <p class="text-[11px] text-slate-400">Perbarui kategori, folder tujuan, poin penting, atau ganti berkas</p>
+                    </div>
+                </div>
+                <button type="button" onclick="ReportManager.closeEditReportModal()" class="text-slate-400 hover:text-slate-600 p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <form id="form-edit-report" onsubmit="ReportManager.submitEditReport(event);" class="space-y-3.5">
+                <input type="hidden" id="edit-report-id">
+                <input type="hidden" id="edit-report-targetsheet">
+
+                <!-- Info Ringkas Identitas Laporan -->
+                <div class="p-3 bg-[#FAF8F5] rounded-2xl border border-[#E8E2D5] flex items-center justify-between text-xs">
+                    <div>
+                        <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">ID Laporan</span>
+                        <span id="edit-report-id-display" class="font-mono font-bold text-blue-600">-</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Pengirim & Sekolah</span>
+                        <span id="edit-report-meta-display" class="font-bold text-slate-700">-</span>
+                    </div>
+                </div>
+
+                <!-- Folder / Jenis Pelaporan -->
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Folder Tujuan</label>
+                    <select id="edit-report-folder" required
+                        class="w-full border border-[#DCD5C7] px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-white focus:ring-2 focus:ring-amber-500">
+                    </select>
+                </div>
+
+                <!-- Kategori / Sub-jenis -->
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Kategori Dokumen</label>
+                    <input type="text" id="edit-report-kategori" required
+                        class="w-full border border-[#DCD5C7] px-3.5 py-2.5 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-amber-500"
+                        placeholder="Contoh: Administrasi / RPP / Supervisi">
+                </div>
+
+                <!-- Poin Penting / Ringkasan -->
+                <div>
+                    <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Ringkasan / Poin Penting Dokumen</label>
+                    <textarea id="edit-report-poin" rows="3" required
+                        class="w-full border border-[#DCD5C7] px-3.5 py-2.5 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-amber-500"
+                        placeholder="Tuliskan poin penting atau ringkasan isi dokumen laporan..."></textarea>
+                </div>
+
+                <!-- Ganti Berkas (Opsional) -->
+                <div class="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200/80 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <label class="text-[11px] font-bold text-slate-700 uppercase">Ganti File Dokumen (Opsional)</label>
+                        <span id="edit-report-current-file-badge" class="text-[10px] text-slate-500 truncate max-w-[180px]">File saat ini: -</span>
+                    </div>
+                    <input type="file" id="edit-report-file-input"
+                        class="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-amber-100 file:text-amber-800 hover:file:bg-amber-200 cursor-pointer">
+                    <p class="text-[10px] text-slate-400 italic">
+                        Biarkan kosong jika hanya memperbarui informasi tanpa mengganti berkas yang sudah ada.
+                    </p>
+                </div>
+
+                <!-- Tombol Aksi -->
+                <div class="pt-3 border-t border-[#F0EBE1] flex justify-end gap-2">
+                    <button type="button" onclick="ReportManager.closeEditReportModal()"
+                        class="px-4 py-2 bg-[#F0EBE1] text-slate-700 rounded-xl text-xs font-semibold hover:bg-[#E5DFD3]">
+                        Batal
+                    </button>
+                    <button type="submit" id="btn-submit-edit-report"
+                        class="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-md shadow-amber-500/25 transition-all flex items-center gap-1.5">
+                        <i class="fa-solid fa-floppy-disk"></i> Simpan Perubahan
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
     <!-- ==================================================================== -->
     <div id="modal-edit-user"
         class="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center hidden p-4 backdrop-blur-sm">
@@ -1553,7 +1641,7 @@
                             </div>
                             <div class="flex items-center gap-2.5 flex-wrap">
                                 <a id="folder-sekolah-root-drive-btn" href="#" target="_blank" rel="noopener noreferrer"
-                                    class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all">
+                                    class="hidden inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all">
                                     <i class="fa-brands fa-google-drive text-sm"></i> Buka Root Google Drive
                                 </a>
                                 <button id="folder-sekolah-add-btn" onclick="ReportManager.openAddGuruFolderModal()"
@@ -1617,6 +1705,77 @@
                             </div>
                             <div id="grid-folder-sekolah-kepsek" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
                                 <!-- Diisi secara dinamis oleh ReportManager.renderFolderSekolahView -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TAMPILAN TABEL BERKAS SAAT FOLDER DIBUKA DI DALAM APLIKASI -->
+                    <div id="wrapper-folder-sekolah-table" class="hidden space-y-4">
+                        <!-- Header Kontrol Folder -->
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between bg-white p-3.5 sm:p-5 rounded-2xl border border-[#E8E2D5] shadow-xs gap-3">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <button onclick="ReportManager.backToFolderSekolahGrid()"
+                                    class="bg-[#F0EBE1] hover:bg-[#E5DFD3] text-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-[#E0D7C5] flex-shrink-0">
+                                    <i class="fa-solid fa-arrow-left"></i> <span>Kembali ke Folder</span>
+                                </button>
+                                <div class="truncate">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <h3 id="table-folder-sekolah-title" class="font-extrabold text-slate-800 text-sm sm:text-base truncate">Folder Dokumen</h3>
+                                        <span id="table-folder-sekolah-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">Arsip</span>
+                                    </div>
+                                    <p id="table-folder-sekolah-subtitle" class="text-[11px] text-slate-400 mt-0.5 truncate">Daftar dokumen laporan di dalam folder ini</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 flex-wrap justify-between sm:justify-end">
+                                <!-- Drive Link (HANYA DITAMPILKAN UNTUK PENGAWAS) -->
+                                <a id="btn-folder-sekolah-table-drive" href="#" target="_blank"
+                                    class="hidden inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all">
+                                    <i class="fa-brands fa-google-drive"></i> Buka di Drive
+                                </a>
+                                <!-- Tombol Cepat Unggah ke Folder Ini -->
+                                <button id="btn-folder-sekolah-table-upload" onclick="ReportManager.uploadToCurrentFolderSekolah()"
+                                    class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all">
+                                    <i class="fa-solid fa-cloud-arrow-up"></i> Unggah ke Folder Ini
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- BULK ACTION BAR FOLDER SEKOLAH -->
+                        <div id="bulk-bar-folder-sekolah" class="hidden px-4 py-2.5 bg-blue-50/90 border border-blue-200 rounded-xl flex items-center justify-between gap-3 text-xs shadow-xs">
+                            <div class="flex items-center gap-2">
+                                <span class="w-6 h-6 rounded-lg bg-blue-600 text-white font-bold text-[11px] flex items-center justify-center bulk-count-badge">0</span>
+                                <span class="font-bold text-blue-900">Laporan Terpilih</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="ReportManager.bulkDeleteReports('folder-sekolah')" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-2xs transition-all">
+                                    <i class="fa-solid fa-trash-can"></i> Hapus Terpilih
+                                </button>
+                                <button onclick="ReportManager.clearSelection('folder-sekolah')" class="px-2.5 py-1.5 bg-white hover:bg-slate-100 text-slate-600 rounded-lg font-semibold text-xs border border-slate-200 transition-all">
+                                    Batal
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- TABEL LAPORAN DOKUMEN DALAM FOLDER -->
+                        <div class="bg-white rounded-2xl border border-[#E8E2D5] shadow-sm overflow-hidden">
+                            <div class="table-scroll-container">
+                                <table class="custom-table min-w-[760px]">
+                                    <thead>
+                                        <tr>
+                                            <th class="w-10 text-center whitespace-nowrap">
+                                                <input type="checkbox" id="check-all-folder-sekolah" onchange="ReportManager.toggleSelectAll('folder-sekolah', this)" class="w-4 h-4 rounded text-blue-600 border-[#D5CEBF] focus:ring-blue-500 cursor-pointer">
+                                            </th>
+                                            <th class="whitespace-nowrap">ID / Tanggal</th>
+                                            <th class="whitespace-nowrap">Pengirim</th>
+                                            <th class="whitespace-nowrap">Kategori & Poin Penting</th>
+                                            <th class="text-center whitespace-nowrap">Dokumen</th>
+                                            <th class="text-center whitespace-nowrap">Status</th>
+                                            <th class="whitespace-nowrap">Catatan</th>
+                                            <th class="text-center whitespace-nowrap">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="table-body-folder-sekolah" class="divide-y divide-[#F0EBE1] text-slate-700"></tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
