@@ -443,7 +443,7 @@ const App = {
             UserManager.loadUsers();
         } else if (tabName === 'guru-manager') {
             titleEl.innerText = "Manajemen & Registrasi Guru";
-            subTitleEl.innerText = "Daftarkan akun guru untuk sekolah Anda beserta folder Google Drive pribadi";
+            subTitleEl.innerText = "Daftarkan dan kelola akun guru untuk sekolah Anda";
             UserManager.loadUsers();
         } else if (tabName === 'drive-manager') {
             titleEl.innerText = "Manajemen Folder Google Drive";

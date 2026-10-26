@@ -219,6 +219,16 @@ const AuthService = {
             else navGroupAdmin.classList.remove("hidden");
         }
 
+        // Sembunyikan status card Google Drive di sidebar untuk Kepala Sekolah dan Guru (Hanya Pengawas yang punya akses)
+        const sidebarDriveStatus = document.getElementById("sidebar-drive-status");
+        if (sidebarDriveStatus) {
+            if (role === "Pengawas") {
+                sidebarDriveStatus.classList.remove("hidden");
+            } else {
+                sidebarDriveStatus.classList.add("hidden");
+            }
+        }
+
         // Tampilkan info profil di sidebar
         const nameEl = document.getElementById("user-info-name");
         const roleEl = document.getElementById("user-info-role");

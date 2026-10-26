@@ -298,7 +298,7 @@
                         <h3 id="modal-add-user-title" class="font-bold text-slate-800 text-base sm:text-lg leading-tight">
                             Tambah Pengguna Baru
                         </h3>
-                        <p class="text-[11px] text-slate-400">Otomatis membuat folder Google Drive</p>
+                        <p id="modal-add-user-subtitle" class="text-[11px] text-slate-400">Pendaftaran akun pengguna sistem</p>
                     </div>
                 </div>
                 <button onclick="UserManager.closeAddUserModal()" class="text-slate-400 hover:text-slate-600 p-1">
@@ -1267,8 +1267,8 @@
 
             <!-- Bottom Section (Fixed Pinned at Bottom) -->
             <div class="flex-shrink-0 border-t border-[#202228] bg-[#0D0E12] p-3 space-y-2.5">
-                <!-- Status Card: Google Drive Sync Info -->
-                <div class="px-2.5 py-2 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-between">
+                <!-- Status Card: Google Drive Sync Info (Hanya untuk Pengawas) -->
+                <div id="sidebar-drive-status" class="px-2.5 py-2 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-between">
                     <div class="flex items-center gap-2 min-w-0">
                         <div class="w-5 h-5 rounded-md bg-emerald-500/15 text-emerald-400 flex items-center justify-center text-[11px] flex-shrink-0">
                             <i class="fa-brands fa-google-drive"></i>
@@ -2339,7 +2339,6 @@
                                         <th class="whitespace-nowrap">Nama & Username</th>
                                         <th class="whitespace-nowrap">Peran</th>
                                         <th class="whitespace-nowrap">Asal Sekolah</th>
-                                        <th class="text-center whitespace-nowrap">Folder Google Drive</th>
                                         <th class="whitespace-nowrap">Status</th>
                                         <th class="text-center whitespace-nowrap">Aksi</th>
                                     </tr>

@@ -148,12 +148,8 @@ const UserManager = {
         const isKepsek = role === "Kepala Sekolah" || role === "Kepsek";
         const userSchool = (currentUser.asal_sekolah || "").trim();
 
-        const targetBodies = [
-            document.getElementById("table-body-users"),
-            document.getElementById("table-body-guru-users")
-        ].filter(Boolean);
-
-        if (targetBodies.length === 0) return;
+        const tableUsers = document.getElementById("table-body-users");
+        const tableGuru = document.getElementById("table-body-guru-users");
 
         // 1. Filter pengguna yang berhak ditampilkan
         let displayUsers = [...(this.cachedUsers || [])];
@@ -181,28 +177,40 @@ const UserManager = {
                 ? `Belum ada guru yang terdaftar pada ${userSchool || 'sekolah Anda'}`
                 : "Belum ada data pengguna terdaftar.";
 
-            targetBodies.forEach(tb => {
-                tb.innerHTML = `
+            if (tableUsers) {
+                tableUsers.innerHTML = `
                     <tr>
                         <td colspan="8" class="p-8 text-center text-slate-400 font-medium">
+                            <i class="fa-solid fa-users text-2xl text-slate-300 block mb-2"></i>
+                            ${emptyMsg}
+                        </td>
+                    </tr>
+                `;
+            }
+            if (tableGuru) {
+                tableGuru.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="p-8 text-center text-slate-400 font-medium">
                             <i class="fa-solid fa-chalkboard-user text-2xl text-slate-300 block mb-2"></i>
                             ${emptyMsg}
                         </td>
                     </tr>
                 `;
-            });
+            }
             this.clearSelection();
             return;
         }
 
-        let htmlRows = "";
+        let htmlRowsUsers = "";
+        let htmlRowsGuru = "";
+
         displayUsers.forEach(u => {
             const roleBadge = this.getRoleBadge(u.role);
-            const driveBtn = u.driveUrl ? `
+            const driveBtn = (isPengawas && u.driveUrl) ? `
                 <a href="${u.driveUrl}" target="_blank" class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg font-semibold text-[11px] transition-colors border border-blue-200">
                     <i class="fa-brands fa-google-drive"></i> Buka Drive
                 </a>
-            ` : `<span class="text-slate-400 text-[11px] italic">Belum ada</span>`;
+            ` : `<span class="text-slate-400 text-[11px] italic">-</span>`;
 
             const isSelf = u.username === currentUser.username;
             const isChecked = this.selectedUserIds.has(u.id);
@@ -261,7 +269,8 @@ const UserManager = {
                 </td>
             `;
 
-            htmlRows += `
+            // Baris untuk Pengawas di tab-user-manager (8 kolom, termasuk Drive)
+            htmlRowsUsers += `
                 <tr class="hover:bg-[#FAF7F0] transition-colors border-b border-[#F0EBE1] ${isChecked ? 'bg-blue-50/40' : ''}">
                     ${checkboxHtml}
                     <td class="p-3.5 font-bold text-slate-700 font-mono whitespace-nowrap">${u.id}</td>
@@ -280,11 +289,30 @@ const UserManager = {
                     <td class="p-3.5 text-center whitespace-nowrap">${actionBtn}</td>
                 </tr>
             `;
+
+            // Baris untuk Kepala Sekolah di tab-guru-manager (7 kolom, TANPA Drive sama sekali)
+            htmlRowsGuru += `
+                <tr class="hover:bg-[#FAF7F0] transition-colors border-b border-[#F0EBE1] ${isChecked ? 'bg-blue-50/40' : ''}">
+                    ${checkboxHtml}
+                    <td class="p-3.5 font-bold text-slate-700 font-mono whitespace-nowrap">${u.id}</td>
+                    <td class="p-3.5 whitespace-nowrap">
+                        <p class="font-bold text-slate-800">${u.nama}</p>
+                        <p class="text-[10px] text-slate-400 font-mono">@${u.username}</p>
+                    </td>
+                    <td class="p-3.5 whitespace-nowrap">${roleBadge}</td>
+                    <td class="p-3.5 font-medium text-slate-700 whitespace-nowrap">${u.asalSekolah || '-'}</td>
+                    <td class="p-3.5 whitespace-nowrap">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${u.status === 'Nonaktif' ? 'bg-rose-100 text-rose-700 border border-rose-200' : 'bg-emerald-100 text-emerald-700 border border-emerald-200'}">
+                            ${u.status || 'Aktif'}
+                        </span>
+                    </td>
+                    <td class="p-3.5 text-center whitespace-nowrap">${actionBtn}</td>
+                </tr>
+            `;
         });
 
-        targetBodies.forEach(tb => {
-            tb.innerHTML = htmlRows;
-        });
+        if (tableUsers) tableUsers.innerHTML = htmlRowsUsers;
+        if (tableGuru) tableGuru.innerHTML = htmlRowsGuru;
 
         this.updateBulkBar();
     },
@@ -561,6 +589,7 @@ const UserManager = {
 
         const modal = document.getElementById("modal-add-user");
         const modalTitle = document.getElementById("modal-add-user-title");
+        const modalSubtitle = document.getElementById("modal-add-user-subtitle");
         const roleSelect = document.getElementById("input-new-role");
         const schoolInput = document.getElementById("input-new-school");
 
@@ -569,12 +598,14 @@ const UserManager = {
 
         if (isPengawas) {
             modalTitle.innerText = "Tambah Pengguna Baru (Pengawas)";
+            if (modalSubtitle) modalSubtitle.innerText = "Pendaftaran akun pengguna sistem";
             roleSelect.disabled = false;
             schoolInput.disabled = false;
             schoolInput.placeholder = "Contoh: SDN 12 Raya Hulu";
         } else {
             // Kepala Sekolah: khusus mendaftarkan Guru untuk sekolahnya
             modalTitle.innerText = `Daftarkan Guru Baru (${currentUser.asal_sekolah})`;
+            if (modalSubtitle) modalSubtitle.innerText = "Daftarkan akun guru binaan aktif sekolah Anda";
             roleSelect.value = "Guru";
             roleSelect.disabled = true;
             schoolInput.value = currentUser.asal_sekolah;
