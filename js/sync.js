@@ -40,15 +40,21 @@ const LiveSync = {
         // 2. Hubungkan state dengan modul-modul lain
         this.bindModules();
 
-        // 3. Jalankan initial background sync segera
+        // 3. Validasi awal sesi aktif terhadap blacklist lokal / status akun
+        if (!this.validateActiveSession()) {
+            return;
+        }
+
+        // 4. Jalankan initial background sync segera
         this.sync({ force: true, silent: true });
 
-        // 4. Mulai interval live sync otomatis
+        // 5. Mulai interval live sync otomatis
         this.startAutoSync();
 
-        // 5. Sync saat tab browser kembali aktif (visibilitychange)
+        // 6. Sync saat tab browser kembali aktif (visibilitychange)
         document.addEventListener("visibilitychange", () => {
             if (document.visibilityState === "visible") {
+                if (!this.validateActiveSession()) return;
                 this.sync({ silent: true });
             }
         });
@@ -82,6 +88,77 @@ const LiveSync = {
             }
         } catch (e) {}
         return set;
+    },
+
+    /**
+     * Memvalidasi apakah sesi pengguna yang sedang login masih valid di database/sistem.
+     * Jika akun atau sekolahnya telah dihapus permanen oleh pengawas, paksa logout segera.
+     */
+    validateActiveSession() {
+        if (typeof AuthService === "undefined" || !AuthService.isLoggedIn()) return true;
+        const currentUser = AuthService.getUser();
+        if (!currentUser) return true;
+        if (currentUser.role === "Pengawas") return true; // Pengawas tidak pernah di-evict otomatis
+
+        const currentUsername = (currentUser.username || "").trim().toLowerCase();
+        const currentSchool = (currentUser.asal_sekolah || "").trim().toLowerCase();
+
+        const deletedSchools = this.getDeletedSchoolsSet();
+        const deletedUsers = this.getDeletedUsernamesSet();
+
+        // 1. Cek blacklist client-side (jika ada catatan akun/sekolah terhapus)
+        if (deletedUsers.has(currentUsername)) {
+            this.forceLogoutDeletedUser(`Akun @${currentUser.username} telah dihapus oleh Pengawas.`);
+            return false;
+        }
+
+        if (currentSchool && deletedSchools.has(currentSchool)) {
+            this.forceLogoutDeletedUser(`Sekolah "${currentUser.asal_sekolah}" telah dihapus total oleh Pengawas.`);
+            return false;
+        }
+
+        // 2. Cek apakah user masih ada di daftar users tersinkron (hanya jika state.users terisi)
+        if (Array.isArray(this.state.users) && this.state.users.length > 0) {
+            const foundUser = this.state.users.find(u => (u.username || "").trim().toLowerCase() === currentUsername);
+            if (!foundUser) {
+                this.forceLogoutDeletedUser("Akun Anda telah dihapus oleh Pengawas dari sistem.");
+                return false;
+            }
+            if (foundUser.status && (foundUser.status.toLowerCase() === "nonaktif" || foundUser.status.toLowerCase() === "dihapus")) {
+                this.forceLogoutDeletedUser("Akun Anda telah dinonaktifkan oleh Pengawas.");
+                return false;
+            }
+        }
+
+        // 3. Cek apakah sekolah binaan masih ada di daftar schools tersinkron (hanya jika state.schools terisi)
+        if (currentSchool && Array.isArray(this.state.schools) && this.state.schools.length > 0) {
+            const schoolExists = this.state.schools.some(s => (s.nama || "").trim().toLowerCase() === currentSchool);
+            if (!schoolExists) {
+                this.forceLogoutDeletedUser(`Sekolah "${currentUser.asal_sekolah}" telah dihapus total oleh Pengawas.`);
+                return false;
+            }
+        }
+
+        return true;
+    },
+
+    /**
+     * Mengeluarkan pengguna secara paksa jika akun/sekolahnya telah dihapus
+     */
+    forceLogoutDeletedUser(reasonMessage) {
+        console.warn("Force logout triggered:", reasonMessage);
+        if (typeof AuthService !== "undefined") {
+            AuthService.clearSession();
+        }
+        document.documentElement.classList.remove("has-session");
+        const loginSec = document.getElementById("login-section");
+        const dashSec = document.getElementById("dashboard-section");
+        if (loginSec) loginSec.classList.remove("hidden");
+        if (dashSec) dashSec.classList.add("hidden");
+
+        if (typeof App !== "undefined" && typeof App.showToast === "function") {
+            App.showToast(`🔒 ${reasonMessage} Sesi otomatis diakhiri.`, "error", 8000);
+        }
     },
 
     /**
@@ -341,8 +418,14 @@ const LiveSync = {
                 const resAll = await ApiService.post({
                     action: "sync_all",
                     currentUserRole: currentUser.role,
+                    currentUsername: currentUser.username,
                     asal_sekolah: currentUser.asal_sekolah
                 });
+
+                if (resAll && resAll.status === "session_terminated") {
+                    this.forceLogoutDeletedUser(resAll.message || "Akun Anda telah dihapus atau dinonaktifkan oleh Pengawas.");
+                    return;
+                }
 
                 if (resAll && resAll.status === "success") {
                     syncAllSuccess = true;
@@ -377,19 +460,31 @@ const LiveSync = {
                     ApiService.post({
                         action: "get_dashboard_data",
                         currentUserRole: currentUser.role,
+                        currentUsername: currentUser.username,
                         asal_sekolah: currentUser.asal_sekolah
                     }),
-                    ApiService.post({ action: "get_users", role: currentUser.role, asal_sekolah: currentUser.asal_sekolah }),
+                    ApiService.post({
+                        action: "get_users",
+                        role: currentUser.role,
+                        currentUsername: currentUser.username,
+                        asal_sekolah: currentUser.asal_sekolah
+                    }),
                     ApiService.post({ action: "get_schools" }),
                     ApiService.post({
                         action: "get_drive_folders",
                         currentUserRole: currentUser.role,
+                        currentUsername: currentUser.username,
                         asal_sekolah: currentUser.asal_sekolah
                     })
                 ];
 
                 const results = await Promise.all(promises);
                 const dashRes = results[0];
+
+                if (dashRes && dashRes.status === "session_terminated") {
+                    this.forceLogoutDeletedUser(dashRes.message || "Akun Anda telah dihapus atau dinonaktifkan oleh Pengawas.");
+                    return;
+                }
 
                 if (dashRes && dashRes.status === "success") {
                     this.state.reportsKepsek = dashRes.reportsKepsek || [];
@@ -433,6 +528,11 @@ const LiveSync = {
                     dataUpdated = true;
                 }
                 this.applyClientFilters(this.state);
+            }
+
+            // Validasi apakah sesi pengguna masih valid di sistem
+            if (!this.validateActiveSession()) {
+                return;
             }
 
             // Isolasi Folder Sekolah: Non-Pengawas HANYA boleh memiliki folder milik sekolahnya sendiri
@@ -738,8 +838,15 @@ const LiveSync = {
         const targetUsernames = [];
         this.state.users.forEach(u => {
             const uid = u.id ? u.id.toString().trim() : "";
-            if (idSet.has(uid) && u.username) {
-                targetUsernames.push(u.username.trim().toLowerCase());
+            const uname = u.username ? u.username.trim().toLowerCase() : "";
+            if (uname && (idSet.has(uid) || idSet.has(uname))) {
+                targetUsernames.push(uname);
+            }
+        });
+        ids.forEach(id => {
+            const lower = id.toLowerCase();
+            if (id && isNaN(Number(id)) && !targetUsernames.includes(lower)) {
+                targetUsernames.push(lower);
             }
         });
 

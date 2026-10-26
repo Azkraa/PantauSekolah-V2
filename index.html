@@ -40,7 +40,7 @@
                     document.documentElement.classList.remove("dark");
                 }
 
-                // 2. Session Checker Instan
+                // 2. Session Checker Instan dengan Verifikasi Blacklist Akun/Sekolah Terhapus
                 var key = "pantausekolah_auth_session";
                 var has = localStorage.getItem(key);
                 if (!has) {
@@ -48,7 +48,27 @@
                     if (match && match[2]) has = match[2];
                 }
                 if (has) {
-                    document.documentElement.classList.add("has-session");
+                    var isInvalid = false;
+                    try {
+                        var parsed = typeof has === "string" && has.charAt(0) === "{" ? JSON.parse(has) : null;
+                        if (parsed) {
+                            var delU = JSON.parse(localStorage.getItem("pantausekolah_deleted_usernames") || "[]");
+                            var delS = JSON.parse(localStorage.getItem("pantausekolah_deleted_schools") || "[]");
+                            var uLower = (parsed.username || "").toLowerCase();
+                            var sLower = (parsed.asal_sekolah || "").toLowerCase();
+                            if (delU.indexOf(uLower) !== -1 || (sLower && delS.indexOf(sLower) !== -1)) {
+                                isInvalid = true;
+                                localStorage.removeItem(key);
+                                document.cookie = key + "=; path=/; max-age=0;";
+                            }
+                        }
+                    } catch (err) {}
+
+                    if (!isInvalid) {
+                        document.documentElement.classList.add("has-session");
+                    } else {
+                        document.documentElement.classList.remove("has-session");
+                    }
                 }
             } catch (e) { }
         })();
@@ -2705,17 +2725,17 @@
     </div>
 
     <!-- SCRIPT DEPENDENCIES (MODULAR LOAD ORDER) -->
-    <script src="js/config.js?v=2.8.6"></script>
-    <script src="js/api.js?v=2.8.6"></script>
-    <script src="js/auth.js?v=2.8.6"></script>
-    <script src="js/sync.js?v=2.8.6"></script>
-    <script src="js/users.js?v=2.8.6"></script>
-    <script src="js/drive.js?v=2.8.6"></script>
-    <script src="js/reports.js?v=2.8.6"></script>
-    <script src="js/dashboard.js?v=2.8.6"></script>
-    <script src="js/audit.js?v=2.8.6"></script>
-    <script src="js/dinas-report.js?v=2.8.6"></script>
-    <script src="js/app.js?v=2.8.6"></script>
+    <script src="js/config.js?v=2.8.7"></script>
+    <script src="js/api.js?v=2.8.7"></script>
+    <script src="js/auth.js?v=2.8.7"></script>
+    <script src="js/sync.js?v=2.8.7"></script>
+    <script src="js/users.js?v=2.8.7"></script>
+    <script src="js/drive.js?v=2.8.7"></script>
+    <script src="js/reports.js?v=2.8.7"></script>
+    <script src="js/dashboard.js?v=2.8.7"></script>
+    <script src="js/audit.js?v=2.8.7"></script>
+    <script src="js/dinas-report.js?v=2.8.7"></script>
+    <script src="js/app.js?v=2.8.7"></script>
 </body>
 
 </html>

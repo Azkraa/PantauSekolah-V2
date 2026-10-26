@@ -129,6 +129,19 @@ const App = {
             return;
         }
 
+        // Cek blacklist client-side
+        const uLower = username.toLowerCase();
+        let isLocallyDeleted = false;
+        try {
+            const delU = JSON.parse(localStorage.getItem("pantausekolah_deleted_usernames") || "[]");
+            if (delU.includes(uLower)) isLocallyDeleted = true;
+        } catch (e) {}
+
+        if (isLocallyDeleted) {
+            this.showToast("Akun ini telah dihapus oleh Pengawas dan tidak dapat digunakan lagi.", "error");
+            return;
+        }
+
         const btnLogin = document.getElementById("btn-login");
         const loadingLogin = document.getElementById("loading-login");
 
@@ -143,6 +156,18 @@ const App = {
             });
 
             if (res.status === "success") {
+                const sLower = (res.asal_sekolah || "").toLowerCase();
+                let isSchoolDeleted = false;
+                try {
+                    const delS = JSON.parse(localStorage.getItem("pantausekolah_deleted_schools") || "[]");
+                    if (sLower && delS.includes(sLower)) isSchoolDeleted = true;
+                } catch (e) {}
+
+                if (isSchoolDeleted) {
+                    this.showToast(`Sekolah "${res.asal_sekolah}" telah dihapus total oleh Pengawas. Akun tidak dapat digunakan lagi.`, "error");
+                    return;
+                }
+
                 // Simpan Sesi
                 AuthService.saveSession({
                     nama: res.nama,

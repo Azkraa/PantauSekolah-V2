@@ -27,6 +27,23 @@ const AuthService = {
             if (raw) {
                 const parsed = JSON.parse(raw);
                 if (parsed && parsed.username && parsed.role) {
+                    // Cek apakah akun atau sekolahnya telah dihapus permanen oleh pengawas
+                    let isDeleted = false;
+                    try {
+                        const delU = JSON.parse(localStorage.getItem("pantausekolah_deleted_usernames") || "[]");
+                        const delS = JSON.parse(localStorage.getItem("pantausekolah_deleted_schools") || "[]");
+                        const uLower = (parsed.username || "").toLowerCase();
+                        const sLower = (parsed.asal_sekolah || "").toLowerCase();
+                        if (delU.includes(uLower) || (sLower && delS.includes(sLower))) {
+                            isDeleted = true;
+                        }
+                    } catch (e) {}
+
+                    if (isDeleted) {
+                        this.clearSession();
+                        return false;
+                    }
+
                     this.currentUser = parsed;
                     return true;
                 }

@@ -462,8 +462,29 @@ function handleLogin(data) {
     const driveFolderUrl = row[9] || "";
 
     if (uName.toLowerCase() === username.toLowerCase()) {
-      if (status.toLowerCase() === "nonaktif") {
-        return jsonResponse({ status: "error", message: "Akun Anda telah dinonaktifkan oleh Pengawas." });
+      if (status.toLowerCase() === "nonaktif" || status.toLowerCase() === "dihapus") {
+        return jsonResponse({ status: "error", message: "Akun Anda telah dinonaktifkan atau dihapus oleh Pengawas." });
+      }
+
+      // Validasi apakah sekolah binaan masih aktif atau sudah dihapus total oleh pengawas
+      if (role !== "Pengawas" && asalSekolah && asalSekolah.toLowerCase() !== "dinas pendidikan" && asalSekolah.toLowerCase() !== "dinas") {
+        const sheetSekolah = ss.getSheetByName(SHEET_SEKOLAH);
+        if (sheetSekolah) {
+          const sRows = sheetSekolah.getDataRange().getValues();
+          let sFound = false;
+          for (let sIdx = 1; sIdx < sRows.length; sIdx++) {
+            if (sRows[sIdx][1] && sRows[sIdx][1].toString().trim().toLowerCase() === asalSekolah.trim().toLowerCase()) {
+              sFound = true;
+              break;
+            }
+          }
+          if (!sFound) {
+            return jsonResponse({
+              status: "error",
+              message: "Sekolah binaan '" + asalSekolah + "' telah dihapus total oleh Pengawas. Akun ini tidak dapat digunakan lagi."
+            });
+          }
+        }
       }
 
       let isMatch = false;
@@ -533,11 +554,17 @@ function handleGetUsers(data) {
 
     // Filtering berdasarkan role peminta:
     // - Pengawas dapat melihat semua user
-    // - Kepala Sekolah HANYA dapat melihat Guru dari sekolahnya sendiri
+    // - Kepala Sekolah dapat melihat Guru dari sekolahnya sendiri serta akun Kepala Sekolah sendiri
+    // - Guru dapat melihat akun dirinya sendiri
     if (requesterRole === "Pengawas") {
       userList.push({ id, username, nama, role, asalSekolah, status, driveUrl, createdAt });
     } else if (requesterRole === "Kepala Sekolah" || requesterRole === "Kepsek") {
-      if (role === "Guru" && (asalSekolah || "").toLowerCase() === requesterSchool.toLowerCase()) {
+      if ((role === "Guru" || role === "Kepala Sekolah" || role === "Kepsek") && (asalSekolah || "").toLowerCase() === requesterSchool.toLowerCase()) {
+        userList.push({ id, username, nama, role, asalSekolah, status, driveUrl, createdAt });
+      }
+    } else if (requesterRole === "Guru") {
+      const reqUName = (data.currentUsername || data.username || "").toString().trim().toLowerCase();
+      if ((username || "").toString().trim().toLowerCase() === reqUName) {
         userList.push({ id, username, nama, role, asalSekolah, status, driveUrl, createdAt });
       }
     }
@@ -1635,8 +1662,93 @@ function handleDeleteDefaultFolder(data) {
 // 6. DASHBOARD & AKTIVITAS LAPORAN
 // =============================================================================
 
+/**
+ * Memvalidasi apakah akun dan sekolah pengguna yang meminta sinkronisasi masih aktif di database.
+ * Jika akun telah dihapus atau dinonaktifkan oleh Pengawas, atau sekolahnya telah dihapus permanen,
+ * kembalikan status session_terminated agar sesi di browser pengguna otomatis diakhiri (force logout).
+ */
+function validateUserAccountActive(ss, username, role, school) {
+  if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (role === "Pengawas") return { active: true };
+  if (!username) return { active: true };
+
+  const uLower = username.toString().trim().toLowerCase();
+  const sLower = (school || "").toString().trim().toLowerCase();
+
+  // 1. Cek keberadaan akun di sheet Users
+  const sheetUsers = ss.getSheetByName(SHEET_USERS);
+  if (sheetUsers) {
+    const uRows = sheetUsers.getDataRange().getValues();
+    let found = false;
+    let isNonaktif = false;
+
+    for (let i = 1; i < uRows.length; i++) {
+      const rowUName = (uRows[i][1] || "").toString().trim().toLowerCase();
+      if (rowUName === uLower) {
+        found = true;
+        const status = (uRows[i][7] || "Aktif").toString().toLowerCase();
+        if (status === "nonaktif" || status === "dihapus") {
+          isNonaktif = true;
+        }
+        break;
+      }
+    }
+
+    if (!found) {
+      return {
+        active: false,
+        message: "Akun @" + username + " telah dihapus oleh Pengawas dari sistem."
+      };
+    }
+    if (isNonaktif) {
+      return {
+        active: false,
+        message: "Akun @" + username + " telah dinonaktifkan oleh Pengawas."
+      };
+    }
+  }
+
+  // 2. Cek apakah sekolah pengguna masih ada di sheet Sekolah (jika bukan dinas)
+  if (sLower && sLower !== "dinas pendidikan" && sLower !== "dinas") {
+    const sheetSekolah = ss.getSheetByName(SHEET_SEKOLAH);
+    if (sheetSekolah) {
+      const sRows = sheetSekolah.getDataRange().getValues();
+      let sFound = false;
+      for (let i = 1; i < sRows.length; i++) {
+        const sch = (sRows[i][1] || "").toString().trim().toLowerCase();
+        if (sch === sLower) {
+          sFound = true;
+          break;
+        }
+      }
+      if (!sFound) {
+        return {
+          active: false,
+          message: "Sekolah binaan '" + school + "' telah dihapus total oleh Pengawas."
+        };
+      }
+    }
+  }
+
+  return { active: true };
+}
+
 function handleGetDashboardData(data) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Validasi sesi aktif pengguna non-pengawas
+  const reqRole = data.currentUserRole || data.role || "";
+  const reqUsername = data.currentUsername || data.username || "";
+  const reqSchool = data.asal_sekolah || data.asalSekolah || "";
+  if (reqRole !== "Pengawas" && reqUsername) {
+    const validation = validateUserAccountActive(ss, reqUsername, reqRole, reqSchool);
+    if (!validation.active) {
+      return jsonResponse({
+        status: "session_terminated",
+        message: validation.message
+      });
+    }
+  }
 
   const sheetKepsek = ss.getSheetByName(SHEET_LAPORAN_KEPSEK);
   const sheetGuru = ss.getSheetByName(SHEET_LAPORAN_GURU);
@@ -1775,6 +1887,20 @@ function handleGetDashboardData(data) {
  */
 function handleSyncAll(data) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Validasi sesi aktif pengguna non-pengawas
+  const reqRole = data.currentUserRole || data.role || "";
+  const reqUsername = data.currentUsername || data.username || "";
+  const reqSchool = data.asal_sekolah || data.asalSekolah || "";
+  if (reqRole !== "Pengawas" && reqUsername) {
+    const validation = validateUserAccountActive(ss, reqUsername, reqRole, reqSchool);
+    if (!validation.active) {
+      return jsonResponse({
+        status: "session_terminated",
+        message: validation.message
+      });
+    }
+  }
 
   const sheetKepsek = ss.getSheetByName(SHEET_LAPORAN_KEPSEK);
   const sheetGuru = ss.getSheetByName(SHEET_LAPORAN_GURU);
