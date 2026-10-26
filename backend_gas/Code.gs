@@ -53,6 +53,9 @@ function doPost(e) {
       case "create_user":
         return handleCreateUser(data);
 
+      case "create_users_batch":
+        return handleCreateUsersBatch(data);
+
       case "update_user":
         return handleUpdateUser(data);
 
@@ -620,6 +623,140 @@ function handleCreateUser(data) {
     message: "Pengguna " + nama + " (" + role + ") berhasil didaftarkan!",
     userId: newUserId,
     driveFolderUrl: userDriveFolderUrl
+  });
+}
+
+function handleCreateUsersBatch(data) {
+  const requesterRole = data.currentUserRole;
+  const requesterSchool = data.currentUserSchool;
+  const rawUsers = data.users || [];
+
+  if (!Array.isArray(rawUsers) || rawUsers.length === 0) {
+    return jsonResponse({ status: "error", message: "Data pengguna dalam berkas tidak ditemukan atau kosong." });
+  }
+
+  // Validasi Hak Akses:
+  const isPengawas = requesterRole === "Pengawas";
+  const isKepsek = requesterRole === "Kepala Sekolah" || requesterRole === "Kepsek";
+
+  if (!isPengawas && !isKepsek) {
+    return jsonResponse({ status: "error", message: "Anda tidak memiliki wewenang untuk mendaftarkan pengguna." });
+  }
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheetUsers = ss.getSheetByName(SHEET_USERS);
+  const rows = sheetUsers.getDataRange().getValues();
+
+  // Kumpulkan username yang sudah ada untuk mencegah duplikasi
+  const existingUsernames = new Set();
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i][1]) {
+      existingUsernames.add(rows[i][1].toString().toLowerCase().trim());
+    }
+  }
+
+  // Cache folder sekolah agar tidak getOrCreate berulang kali dalam satu batch
+  const schoolFolderCache = {};
+
+  const rowsToAppend = [];
+  let successCount = 0;
+  let skippedCount = 0;
+  let lastRowIndex = sheetUsers.getLastRow();
+
+  const now = new Date();
+
+  rawUsers.forEach(u => {
+    const nama = (u.nama || "").toString().trim();
+    const username = (u.username || "").toString().trim().replace(/^@/, "");
+    let password = (u.password || "").toString().trim();
+    let role = (u.role || "Guru").toString().trim();
+    let asalSekolah = (u.asal_sekolah || "").toString().trim();
+
+    // Jika peminta adalah Kepala Sekolah, batasi hanya Guru di sekolahnya sendiri
+    if (isKepsek) {
+      role = "Guru";
+      asalSekolah = requesterSchool;
+    }
+
+    if (!nama || !username) {
+      skippedCount++;
+      return;
+    }
+
+    const uLower = username.toLowerCase();
+    if (existingUsernames.has(uLower)) {
+      skippedCount++;
+      return;
+    }
+
+    existingUsernames.add(uLower);
+
+    if (!password) {
+      password = "pass" + Math.floor(1000 + Math.random() * 9000);
+    }
+
+    // Ambil/buat folder sekolah jika ada
+    let userDriveFolderId = "";
+    let userDriveFolderUrl = "";
+    if (asalSekolah) {
+      if (!schoolFolderCache[asalSekolah]) {
+        try {
+          schoolFolderCache[asalSekolah] = getOrCreateSchoolFolder(asalSekolah);
+        } catch (e) {
+          schoolFolderCache[asalSekolah] = { id: "", url: "" };
+        }
+      }
+      const sf = schoolFolderCache[asalSekolah];
+      userDriveFolderId = sf.id || "";
+      userDriveFolderUrl = sf.url || "";
+    }
+
+    // Hash Password
+    const salt = generateSalt(8);
+    const passwordHash = hashPassword(password, salt);
+
+    lastRowIndex++;
+    const newUserId = "USR-" + ("000" + lastRowIndex).slice(-3);
+
+    rowsToAppend.push([
+      newUserId,
+      username,
+      passwordHash,
+      salt,
+      nama,
+      role,
+      asalSekolah,
+      "Aktif",
+      userDriveFolderId,
+      userDriveFolderUrl,
+      now
+    ]);
+
+    successCount++;
+  });
+
+  if (rowsToAppend.length > 0) {
+    const startRow = sheetUsers.getLastRow() + 1;
+    const numRows = rowsToAppend.length;
+    const numCols = rowsToAppend[0].length;
+    sheetUsers.getRange(startRow, 1, numRows, numCols).setValues(rowsToAppend);
+
+    recordAuditLog(
+      data.currentUserName || (isPengawas ? "Pengawas" : "Kepala Sekolah"),
+      data.currentUserUsername || "-",
+      requesterRole,
+      requesterSchool || "-",
+      "Import Pengguna Batch",
+      "Mendaftarkan massal " + successCount + " pengguna baru via Excel/Spreadsheet",
+      "Jumlah Berhasil: " + successCount + " • Dilewati: " + skippedCount
+    );
+  }
+
+  return jsonResponse({
+    status: "success",
+    message: "Berhasil mengimpor " + successCount + " pengguna baru" + (skippedCount > 0 ? " (" + skippedCount + " dilewati karena duplikat/tidak lengkap)" : "") + ".",
+    createdCount: successCount,
+    skippedCount: skippedCount
   });
 }
 

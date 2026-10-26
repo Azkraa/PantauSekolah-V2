@@ -724,5 +724,411 @@ const UserManager = {
         if (typeof LiveSync !== "undefined") {
             LiveSync.optimisticDeleteUser(userId);
         }
+    },
+
+    // =========================================================================
+    // FITUR TEMPLATE & IMPORT EXCEL UNTUK PENGAWAS & KEPALA SEKOLAH
+    // =========================================================================
+    currentImportMode: "all", // 'all' | 'guru'
+    parsedImportRows: [],
+
+    /**
+     * Unduh Template Excel untuk pendaftaran pengguna baru
+     * @param {'all'|'guru'} mode 
+     */
+    downloadExcelTemplate(mode = "all") {
+        const currentUser = typeof AuthService !== "undefined" ? AuthService.getUser() : null;
+        const currentRole = currentUser ? currentUser.role : "";
+        const isKepsek = currentRole === "Kepala Sekolah" || currentRole === "Kepsek";
+        const currentSchool = currentUser ? (currentUser.asal_sekolah || "") : "";
+
+        // Jika dipanggil oleh Kepala Sekolah, otomatis mode 'guru'
+        if (isKepsek || mode === "guru") {
+            const fileName = `Template_Import_Guru_${(currentSchool || "Sekolah").replace(/[^a-zA-Z0-9]/g, "_")}.xlsx`;
+            const headers = ["Nama Lengkap", "Username", "Password"];
+            const exampleData = [
+                headers,
+                ["Ahmad Fauzi, S.Pd.", "ahmad_fauzi", "guru12345"],
+                ["Siti Nurhaliza, M.Pd.", "siti_nurhaliza", "guru12345"],
+                ["Budi Santoso, S.Pd.SD", "budi_santoso", "guru12345"]
+            ];
+
+            if (typeof XLSX !== "undefined") {
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.aoa_to_sheet(exampleData);
+                ws["!cols"] = [{ wch: 28 }, { wch: 20 }, { wch: 18 }];
+                XLSX.utils.book_append_sheet(wb, ws, "Daftar Guru");
+
+                const wsHelp = XLSX.utils.aoa_to_sheet([
+                    ["PETUNJUK PENGISIAN TEMPLATE GURU"],
+                    ["1. Kolom 'Nama Lengkap': Isi nama lengkap dan gelar guru."],
+                    ["2. Kolom 'Username': Gunakan huruf kecil, angka, atau garis bawah tanpa spasi (min. 3 karakter)."],
+                    ["3. Kolom 'Password': Password awal untuk login akun guru (min. 5 karakter)."],
+                    ["4. Peran otomatis ditetapkan sebagai Guru."],
+                    ["5. Asal sekolah otomatis ditetapkan ke: " + (currentSchool || "Sekolah Anda") + "."]
+                ]);
+                wsHelp["!cols"] = [{ wch: 80 }];
+                XLSX.utils.book_append_sheet(wb, wsHelp, "Petunjuk Pengisian");
+
+                XLSX.writeFile(wb, fileName);
+            } else {
+                let csvContent = "\uFEFF" + exampleData.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
+                const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = fileName.replace(".xlsx", ".csv");
+                link.click();
+            }
+            App.showToast("Template Excel Guru berhasil diunduh!", "success");
+            return;
+        }
+
+        // Mode 'all' untuk Pengawas
+        const fileName = "Template_Import_Pengguna_Sistem.xlsx";
+        const headers = ["Nama Lengkap", "Username", "Password", "Peran", "Asal Sekolah"];
+        const exampleData = [
+            headers,
+            ["Drs. H. Mulyadi, M.Pd.", "mulyadi_kepsek", "pass12345", "Kepala Sekolah", "SDN 12 Raya Hulu"],
+            ["Dewi Lestari, S.Pd.", "dewi_lestari", "pass12345", "Guru", "SDN 12 Raya Hulu"],
+            ["Ahmad Fauzi, S.Pd.", "ahmad_fauzi", "pass12345", "Guru", "SDN 04 Pinoh"],
+            ["Drs. H. Bambang Sujarwo, M.Pd.", "bambang_pengawas", "pass12345", "Pengawas", "Dinas Pendidikan"]
+        ];
+
+        if (typeof XLSX !== "undefined") {
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(exampleData);
+            ws["!cols"] = [{ wch: 32 }, { wch: 20 }, { wch: 16 }, { wch: 18 }, { wch: 26 }];
+            XLSX.utils.book_append_sheet(wb, ws, "Daftar Pengguna");
+
+            const wsHelp = XLSX.utils.aoa_to_sheet([
+                ["PETUNJUK PENGISIAN TEMPLATE PENGGUNA SISTEM"],
+                ["1. Kolom 'Nama Lengkap': Isi nama lengkap dan gelar pengguna."],
+                ["2. Kolom 'Username': Gunakan huruf kecil, angka, atau garis bawah tanpa spasi (min. 3 karakter)."],
+                ["3. Kolom 'Password': Password awal untuk login akun (min. 5 karakter)."],
+                ["4. Kolom 'Peran': Pilih salah satu dari 'Guru', 'Kepala Sekolah', atau 'Pengawas'."],
+                ["5. Kolom 'Asal Sekolah': Tulis nama sekolah binaan resmi. Untuk Pengawas, isi 'Dinas Pendidikan'."]
+            ]);
+            wsHelp["!cols"] = [{ wch: 80 }];
+            XLSX.utils.book_append_sheet(wb, wsHelp, "Petunjuk Pengisian");
+
+            XLSX.writeFile(wb, fileName);
+        } else {
+            let csvContent = "\uFEFF" + exampleData.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
+            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = fileName.replace(".xlsx", ".csv");
+            link.click();
+        }
+        App.showToast("Template Excel Pengguna berhasil diunduh!", "success");
+    },
+
+    openImportModal(mode = "all") {
+        const currentUser = typeof AuthService !== "undefined" ? AuthService.getUser() : null;
+        const currentRole = currentUser ? currentUser.role : "";
+        const isKepsek = currentRole === "Kepala Sekolah" || currentRole === "Kepsek";
+
+        this.currentImportMode = (isKepsek || mode === "guru") ? "guru" : "all";
+        this.parsedImportRows = [];
+
+        const modal = document.getElementById("modal-import-users");
+        const titleEl = document.getElementById("modal-import-title");
+        const subTitleEl = document.getElementById("modal-import-subtitle");
+        const fileInput = document.getElementById("import-users-file-input");
+        const dropLabel = document.getElementById("import-users-drop-label");
+        const previewBox = document.getElementById("import-users-preview-box");
+        const loadingBox = document.getElementById("import-users-loading");
+        const btnSubmit = document.getElementById("btn-submit-import-users");
+        const btnSubmitText = document.getElementById("btn-submit-import-text");
+
+        if (fileInput) fileInput.value = "";
+        if (dropLabel) dropLabel.innerHTML = `Klik atau seret file Excel ke sini`;
+        if (previewBox) previewBox.classList.add("hidden");
+        if (loadingBox) loadingBox.classList.add("hidden");
+        if (btnSubmit) {
+            btnSubmit.disabled = true;
+            btnSubmit.classList.add("opacity-50", "cursor-not-allowed");
+        }
+        if (btnSubmitText) btnSubmitText.innerText = "Mulai Impor Akun";
+
+        if (this.currentImportMode === "guru") {
+            if (titleEl) titleEl.innerText = `Unggah Akun Guru Baru (Excel)`;
+            if (subTitleEl) subTitleEl.innerText = `Daftarkan banyak akun guru sekaligus untuk ${currentUser?.asal_sekolah || "sekolah Anda"}`;
+        } else {
+            if (titleEl) titleEl.innerText = `Unggah Pengguna Baru (Excel)`;
+            if (subTitleEl) subTitleEl.innerText = `Impor akun massal (Pengawas, Kepala Sekolah, dan Guru) dari template Excel`;
+        }
+
+        if (modal) modal.classList.remove("hidden");
+    },
+
+    closeImportModal() {
+        const modal = document.getElementById("modal-import-users");
+        if (modal) modal.classList.add("hidden");
+        this.parsedImportRows = [];
+    },
+
+    async handleImportFileSelect(event) {
+        const file = event.target.files ? event.target.files[0] : null;
+        if (!file) return;
+
+        const dropLabel = document.getElementById("import-users-drop-label");
+        if (dropLabel) {
+            dropLabel.innerHTML = `<i class="fa-solid fa-file-excel text-emerald-600 mr-1.5"></i> <span class="font-bold text-slate-800">${file.name}</span> <span class="text-xs text-slate-400">(${(file.size / 1024).toFixed(1)} KB)</span>`;
+        }
+
+        const loadingBox = document.getElementById("import-users-loading");
+        const loadingText = document.getElementById("import-users-loading-text");
+        const previewBox = document.getElementById("import-users-preview-box");
+        const tbody = document.getElementById("import-users-preview-tbody");
+        const statBadge = document.getElementById("import-users-stat-badge");
+        const validInfo = document.getElementById("import-users-valid-info");
+        const btnSubmit = document.getElementById("btn-submit-import-users");
+        const btnSubmitText = document.getElementById("btn-submit-import-text");
+
+        if (loadingBox) {
+            loadingBox.classList.remove("hidden");
+            if (loadingText) loadingText.innerText = "Membaca dan memverifikasi data file spreadsheet...";
+        }
+        if (previewBox) previewBox.classList.add("hidden");
+
+        try {
+            const dataBuffer = await file.arrayBuffer();
+            if (typeof XLSX === "undefined") {
+                throw new Error("Library SheetJS (XLSX) belum siap dimuat.");
+            }
+
+            const workbook = XLSX.read(dataBuffer, { type: "array" });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            const rawJson = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+            if (!rawJson || rawJson.length === 0) {
+                App.showToast("File Excel kosong atau tidak memiliki baris data.", "warning");
+                if (loadingBox) loadingBox.classList.add("hidden");
+                return;
+            }
+
+            const currentUser = typeof AuthService !== "undefined" ? AuthService.getUser() : null;
+            const currentSchool = currentUser ? (currentUser.asal_sekolah || "") : "";
+            const isGuruMode = this.currentImportMode === "guru";
+
+            // Kumpulan username yang sudah terdaftar di sistem
+            const existingUsernames = new Set(
+                (this.cachedUsers || []).map(u => (u.username || "").toLowerCase().trim()).filter(Boolean)
+            );
+            const seenFileUsernames = new Set();
+
+            const parsedRows = [];
+
+            rawJson.forEach((row, idx) => {
+                let nama = "";
+                let username = "";
+                let password = "";
+                let role = isGuruMode ? "Guru" : "Guru";
+                let asalSekolah = isGuruMode ? currentSchool : "";
+
+                for (const key of Object.keys(row)) {
+                    const normKey = key.toLowerCase().replace(/[^a-z0-9]/g, "");
+                    const val = (row[key] !== undefined && row[key] !== null) ? String(row[key]).trim() : "";
+
+                    if (normKey.includes("nama")) {
+                        nama = val;
+                    } else if (normKey.includes("user")) {
+                        username = val.replace(/^@/, "").trim();
+                    } else if (normKey.includes("pass") || normKey.includes("sandi")) {
+                        password = val;
+                    } else if (normKey.includes("peran") || normKey.includes("role")) {
+                        if (!isGuruMode) role = val;
+                    } else if (normKey.includes("sekolah")) {
+                        if (!isGuruMode) asalSekolah = val;
+                    }
+                }
+
+                if (!isGuruMode) {
+                    const rLower = role.toLowerCase();
+                    if (rLower.includes("kepala") || rLower.includes("kepsek")) role = "Kepala Sekolah";
+                    else if (rLower.includes("pengawas")) role = "Pengawas";
+                    else role = "Guru";
+
+                    if (role === "Pengawas" && !asalSekolah) {
+                        asalSekolah = "Dinas Pendidikan";
+                    }
+                }
+
+                if (!password) {
+                    password = "pass" + Math.floor(1000 + Math.random() * 9000);
+                }
+
+                let status = "valid";
+                let statusMsg = "Siap Diimpor";
+
+                if (!nama) {
+                    status = "error";
+                    statusMsg = "Nama Lengkap kosong";
+                } else if (!username) {
+                    status = "error";
+                    statusMsg = "Username kosong";
+                } else if (username.length < 3) {
+                    status = "error";
+                    statusMsg = "Username min. 3 karakter";
+                } else if (!isGuruMode && !asalSekolah) {
+                    status = "error";
+                    statusMsg = "Asal Sekolah kosong";
+                } else if (seenFileUsernames.has(username.toLowerCase())) {
+                    status = "warning";
+                    statusMsg = "Duplikat di file ini";
+                } else if (existingUsernames.has(username.toLowerCase())) {
+                    status = "warning";
+                    statusMsg = "Username sudah terdaftar";
+                }
+
+                if (username) {
+                    seenFileUsernames.add(username.toLowerCase());
+                }
+
+                parsedRows.push({
+                    rowNum: idx + 1,
+                    nama,
+                    username,
+                    password,
+                    role,
+                    asalSekolah,
+                    status,
+                    statusMsg
+                });
+            });
+
+            this.parsedImportRows = parsedRows;
+
+            let validCount = 0;
+            let tbodyHtml = "";
+
+            parsedRows.forEach((r, i) => {
+                let badgeClass = "";
+                let icon = "";
+                if (r.status === "valid") {
+                    validCount++;
+                    badgeClass = "bg-emerald-50 text-emerald-700 border-emerald-200";
+                    icon = '<i class="fa-solid fa-circle-check text-[10px] mr-1"></i>';
+                } else if (r.status === "warning") {
+                    badgeClass = "bg-amber-50 text-amber-700 border-amber-200";
+                    icon = '<i class="fa-solid fa-triangle-exclamation text-[10px] mr-1"></i>';
+                } else {
+                    badgeClass = "bg-rose-50 text-rose-700 border-rose-200";
+                    icon = '<i class="fa-solid fa-circle-xmark text-[10px] mr-1"></i>';
+                }
+
+                tbodyHtml += `
+                    <tr class="hover:bg-[#FAF8F5] transition-colors ${r.status !== 'valid' ? 'opacity-80' : ''}">
+                        <td class="text-center font-bold text-slate-400">${i + 1}</td>
+                        <td class="font-bold text-slate-800">${r.nama || '<span class="text-rose-500 italic">Kosong</span>'}</td>
+                        <td class="font-mono text-blue-600 font-semibold">@${r.username || '<span class="text-rose-500 italic">-</span>'}</td>
+                        <td class="font-mono text-slate-500">${r.password}</td>
+                        <td><span class="px-2 py-0.5 rounded text-[10px] font-bold ${r.role === 'Pengawas' ? 'bg-indigo-50 text-indigo-700' : (r.role === 'Kepala Sekolah' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700')}">${r.role}</span></td>
+                        <td class="text-slate-600 truncate max-w-[150px]" title="${r.asalSekolah}">${r.asalSekolah || '-'}</td>
+                        <td class="text-center">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${badgeClass}">
+                                ${icon} ${r.statusMsg}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            if (tbody) tbody.innerHTML = tbodyHtml;
+            if (statBadge) statBadge.innerText = `${parsedRows.length} Baris Terbaca`;
+            if (validInfo) {
+                validInfo.innerHTML = `<strong>${validCount}</strong> baris valid • <strong>${parsedRows.length - validCount}</strong> baris dilewati/perlu koreksi`;
+            }
+
+            if (btnSubmit) {
+                if (validCount > 0) {
+                    btnSubmit.disabled = false;
+                    btnSubmit.classList.remove("opacity-50", "cursor-not-allowed");
+                    if (btnSubmitText) btnSubmitText.innerText = `Mulai Impor ${validCount} Akun`;
+                } else {
+                    btnSubmit.disabled = true;
+                    btnSubmit.classList.add("opacity-50", "cursor-not-allowed");
+                    if (btnSubmitText) btnSubmitText.innerText = "Tidak Ada Akun Valid";
+                }
+            }
+
+            if (loadingBox) loadingBox.classList.add("hidden");
+            if (previewBox) previewBox.classList.remove("hidden");
+
+            if (validCount > 0) {
+                App.showToast(`Berhasil membaca ${parsedRows.length} baris data (${validCount} siap diimpor).`, "success");
+            } else {
+                App.showToast("Tidak ada baris yang valid untuk diimpor. Mohon periksa kembali kolom file template.", "warning");
+            }
+        } catch (err) {
+            console.error("Error membaca Excel:", err);
+            App.showToast("Gagal membaca berkas spreadsheet: " + (err.message || "Format tidak sesuai"), "error");
+            if (loadingBox) loadingBox.classList.add("hidden");
+        }
+    },
+
+    async executeBatchImport() {
+        const validRows = (this.parsedImportRows || []).filter(r => r.status === "valid");
+        if (validRows.length === 0) {
+            App.showToast("Tidak ada akun valid untuk diimpor.", "warning");
+            return;
+        }
+
+        const btnSubmit = document.getElementById("btn-submit-import-users");
+        const btnSubmitText = document.getElementById("btn-submit-import-text");
+
+        if (btnSubmit) {
+            btnSubmit.disabled = true;
+            btnSubmit.classList.add("opacity-50", "cursor-not-allowed");
+        }
+        if (btnSubmitText) {
+            btnSubmitText.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin mr-1.5"></i> Mengimpor ${validRows.length} Akun...`;
+        }
+
+        const currentUser = typeof AuthService !== "undefined" ? AuthService.getUser() : null;
+
+        try {
+            const payloadUsers = validRows.map(r => ({
+                nama: r.nama,
+                username: r.username,
+                password: r.password,
+                role: r.role,
+                asal_sekolah: r.asalSekolah
+            }));
+
+            const res = await ApiService.post({
+                action: "create_users_batch",
+                currentUserRole: currentUser ? currentUser.role : "",
+                currentUserSchool: currentUser ? currentUser.asal_sekolah : "",
+                currentUserName: currentUser ? currentUser.nama : "",
+                currentUserUsername: currentUser ? currentUser.username : "",
+                users: payloadUsers
+            });
+
+            if (res && res.status === "success") {
+                const count = res.createdCount !== undefined ? res.createdCount : validRows.length;
+                App.showToast(`Sukses! ${count} akun berhasil didaftarkan dan disimpan ke sistem.`, "success");
+                this.closeImportModal();
+                await this.loadUsers();
+                if (typeof LiveSync !== "undefined") {
+                    LiveSync.sync({ silent: true });
+                }
+            } else {
+                App.showToast(res.message || "Gagal mengimpor akun pengguna ke server.", "error");
+            }
+        } catch (err) {
+            console.error("Batch import error:", err);
+            App.showToast("Terjadi kesalahan jaringan saat mengimpor akun massal.", "error");
+        } finally {
+            if (btnSubmit) {
+                btnSubmit.disabled = false;
+                btnSubmit.classList.remove("opacity-50", "cursor-not-allowed");
+            }
+            if (btnSubmitText) {
+                btnSubmitText.innerText = "Mulai Impor Akun";
+            }
+        }
     }
 };

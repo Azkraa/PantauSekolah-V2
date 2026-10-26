@@ -2547,7 +2547,7 @@ const ReportManager = {
         }
         const addKepsekFolderBtn = document.getElementById("folder-sekolah-add-kepsek-btn");
         if (addKepsekFolderBtn) {
-            addKepsekFolderBtn.style.display = isPengawas ? "inline-flex" : "none";
+            addKepsekFolderBtn.style.display = (isPengawas || isKepsek) ? "inline-flex" : "none";
         }
 
         // 3. Switcher Sekolah (Hanya untuk Pengawas jika memiliki banyak sekolah binaan)
@@ -2760,16 +2760,16 @@ const ReportManager = {
                                 <a href="${f.driveFolderUrl}" target="_blank" class="text-blue-600 hover:text-blue-800 font-bold text-[11px] flex items-center gap-1.5 hover:underline">
                                     <i class="fa-brands fa-google-drive"></i> Buka Drive
                                 </a>
-                            ` : '<span class="text-[10px] text-slate-400 font-medium flex items-center gap-1"><i class="fa-solid fa-folder-closed text-slate-300"></i> Buka di Aplikasi</span>'}
-                            ${isPengawas ? `
+                            ` : `
+                                <button onclick="ReportManager.openFolderSekolahTable('kepsek', '${safeFldName}', '${safeTargetSchool}')" class="text-amber-700 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 border border-amber-200 transition-colors">
+                                    <i class="fa-solid fa-folder-open text-[11px]"></i> Kelola Berkas
+                                </button>
+                            `}
+                            ${(isPengawas || isKepsek) ? `
                                 <button onclick="event.stopPropagation(); ReportManager.confirmDeleteGuruFolder('${f.id}', '${safeFldName}', '${safeTargetSchool}')" title="Hapus Folder Khusus Kepala Sekolah" class="text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 border border-rose-200 transition-colors">
                                     <i class="fa-solid fa-trash-can text-[11px]"></i> Hapus
                                 </button>
-                            ` : `
-                                <span class="text-[10px] font-bold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 flex items-center gap-1.5">
-                                    <i class="fa-solid fa-lock text-amber-600 text-[10px]"></i> Terkunci • Arsip
-                                </span>
-                            `}
+                            ` : ''}
                         </div>
                     </div>
                 `;
