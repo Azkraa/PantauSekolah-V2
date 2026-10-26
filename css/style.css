@@ -221,9 +221,13 @@ body {
    Print Stylesheet for Official Dinas Education Reports
    ========================================================================== */
 @media print {
-    body {
+    html,
+    html.dark,
+    body,
+    html.dark body {
         background-color: #FFFFFF !important;
         color: #000000 !important;
+        color-scheme: light !important;
     }
 
     #main-sidebar,
@@ -245,16 +249,56 @@ body {
         width: 100% !important;
         height: auto !important;
         overflow: visible !important;
-        background: transparent !important;
+        background: #FFFFFF !important;
     }
 
-    #dinas-report-paper {
+    #dinas-report-paper,
+    html.dark #dinas-report-paper,
+    html.dark #dinas-report-paper.real-paper-mode {
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
         box-shadow: none !important;
         border: none !important;
         padding: 0 !important;
         margin: 0 !important;
         max-width: 100% !important;
         width: 100% !important;
+    }
+
+    #dinas-report-paper *,
+    html.dark #dinas-report-paper * {
+        color: #000000 !important;
+        border-color: #000000 !important;
+        background-color: transparent !important;
+    }
+
+    #dinas-report-paper .border-double,
+    html.dark #dinas-report-paper .border-double {
+        border-color: #000000 !important;
+    }
+
+    #dinas-report-paper table,
+    html.dark #dinas-report-paper table {
+        border-color: #000000 !important;
+    }
+
+    #dinas-report-paper table th,
+    html.dark #dinas-report-paper table th {
+        background-color: #F1F5F9 !important;
+        color: #000000 !important;
+        border-color: #000000 !important;
+    }
+
+    #dinas-report-paper table td,
+    html.dark #dinas-report-paper table td {
+        border-color: #000000 !important;
+        color: #000000 !important;
+    }
+
+    #dinas-report-paper .bg-slate-50,
+    html.dark #dinas-report-paper .bg-slate-50 {
+        background-color: #F8FAFC !important;
+        border-color: #CCCCCC !important;
     }
 
     @page {
@@ -333,6 +377,7 @@ html.dark .border-slate-200 {
 }
 
 /* 6. Penyesuaian Kontras Tipografi */
+html.dark .text-slate-900,
 html.dark .text-slate-800,
 html.dark .text-slate-700,
 html.dark #page-title {
@@ -505,6 +550,261 @@ html.dark .status-badge-ditolak {
     background-color: rgba(239, 68, 68, 0.15) !important;
     color: #F87171 !important;
     border-color: rgba(239, 68, 68, 0.3) !important;
+}
+
+/* ==========================================================================
+   14. Pratinjau Dokumen Dinas Pendidikan (#dinas-report-paper)
+   ========================================================================== */
+
+/* Mode 1: Lembar Dokumen Gelap (High Contrast Dark Sheet) - Default saat Dark Mode */
+html.dark #dinas-report-paper:not(.real-paper-mode) {
+    background-color: #111827 !important;
+    border-color: #1F2937 !important;
+    color: #F8FAFC !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* KOP Surat */
+html.dark #dinas-report-paper:not(.real-paper-mode) .border-double {
+    border-color: #475569 !important;
+}
+
+html.dark #dinas-report-paper:not(.real-paper-mode) .fa-graduation-cap,
+html.dark #dinas-report-paper:not(.real-paper-mode) .fa-award {
+    color: #93C5FD !important;
+}
+
+html.dark #dinas-report-paper:not(.real-paper-mode) .font-serif {
+    color: #F8FAFC !important;
+}
+
+/* Judul & Nomor Dokumen */
+html.dark #dinas-report-paper:not(.real-paper-mode) h2 {
+    color: #F8FAFC !important;
+}
+
+html.dark #dinas-report-paper:not(.real-paper-mode) .font-mono {
+    color: #94A3B8 !important;
+}
+
+/* Garis Pembatas Bagian */
+html.dark #dinas-report-paper:not(.real-paper-mode) .border-slate-300,
+html.dark #dinas-report-paper:not(.real-paper-mode) .border-slate-200 {
+    border-color: #334155 !important;
+}
+
+/* Label & Teks */
+html.dark #dinas-report-paper:not(.real-paper-mode) .text-slate-900,
+html.dark #dinas-report-paper:not(.real-paper-mode) .text-slate-800 {
+    color: #F8FAFC !important;
+}
+
+html.dark #dinas-report-paper:not(.real-paper-mode) .text-slate-700 {
+    color: #CBD5E1 !important;
+}
+
+html.dark #dinas-report-paper:not(.real-paper-mode) .text-slate-600,
+html.dark #dinas-report-paper:not(.real-paper-mode) .text-slate-500 {
+    color: #94A3B8 !important;
+}
+
+/* KPI Box Mini */
+html.dark #dinas-report-paper:not(.real-paper-mode) .grid.grid-cols-4 {
+    background-color: #172234 !important;
+    border-color: #253349 !important;
+}
+
+html.dark #dinas-report-paper:not(.real-paper-mode) .text-blue-800 {
+    color: #60A5FA !important;
+}
+
+html.dark #dinas-report-paper:not(.real-paper-mode) .text-emerald-800 {
+    color: #34D399 !important;
+}
+
+html.dark #dinas-report-paper:not(.real-paper-mode) .text-amber-800 {
+    color: #FBBF24 !important;
+}
+
+/* Tabel Dokumen Dinas */
+html.dark #dinas-report-paper:not(.real-paper-mode) table {
+    border-color: #334155 !important;
+}
+
+html.dark #dinas-report-paper:not(.real-paper-mode) table thead tr {
+    background-color: #1E293B !important;
+    border-color: #334155 !important;
+}
+
+html.dark #dinas-report-paper:not(.real-paper-mode) table th {
+    background-color: #1E293B !important;
+    color: #CBD5E1 !important;
+    border-color: #334155 !important;
+}
+
+html.dark #dinas-report-paper:not(.real-paper-mode) table td {
+    border-color: #334155 !important;
+}
+
+html.dark #dinas-report-paper:not(.real-paper-mode) table tr:hover {
+    background-color: rgba(30, 41, 59, 0.4) !important;
+}
+
+/* Badge Predikat di Tabel (Dark Sheet) */
+html.dark #dinas-report-paper:not(.real-paper-mode) .bg-emerald-100 {
+    background-color: rgba(6, 78, 59, 0.45) !important;
+    color: #34D399 !important;
+    border-color: rgba(16, 185, 129, 0.4) !important;
+}
+
+html.dark #dinas-report-paper:not(.real-paper-mode) .bg-blue-100 {
+    background-color: rgba(30, 58, 138, 0.45) !important;
+    color: #60A5FA !important;
+    border-color: rgba(59, 130, 246, 0.4) !important;
+}
+
+html.dark #dinas-report-paper:not(.real-paper-mode) .bg-amber-100 {
+    background-color: rgba(120, 53, 15, 0.45) !important;
+    color: #FBBF24 !important;
+    border-color: rgba(245, 158, 11, 0.4) !important;
+}
+
+html.dark #dinas-report-paper:not(.real-paper-mode) .bg-rose-100 {
+    background-color: rgba(136, 19, 55, 0.45) !important;
+    color: #FB7185 !important;
+    border-color: rgba(244, 63, 94, 0.4) !important;
+}
+
+/* Kotak Evaluasi Temuan & Rekomendasi */
+html.dark #dinas-report-paper:not(.real-paper-mode) .whitespace-pre-line {
+    background-color: #172234 !important;
+    border-color: #253349 !important;
+    color: #E2E8F0 !important;
+}
+
+/* Kolom Tanda Tangan */
+html.dark #dinas-report-paper:not(.real-paper-mode) .pt-4.border-t {
+    border-color: #334155 !important;
+}
+
+/* Mode 2: Lembar Kertas Putih A4 Asli (Real A4 Sheet Preview) */
+/* Memungkinkan inspeksi dokumen persis seperti cetakan fisik di atas layar gelap */
+html.dark #dinas-report-paper.real-paper-mode {
+    background-color: #FFFFFF !important;
+    border-color: #CBD5E1 !important;
+    color: #0F172A !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.15) !important;
+}
+
+html.dark #dinas-report-paper.real-paper-mode * {
+    color: inherit;
+}
+
+html.dark #dinas-report-paper.real-paper-mode .border-double {
+    border-color: #0F172A !important;
+}
+
+html.dark #dinas-report-paper.real-paper-mode .fa-graduation-cap,
+html.dark #dinas-report-paper.real-paper-mode .fa-award {
+    color: #1E293B !important;
+}
+
+html.dark #dinas-report-paper.real-paper-mode .font-serif,
+html.dark #dinas-report-paper.real-paper-mode h2,
+html.dark #dinas-report-paper.real-paper-mode .text-slate-900 {
+    color: #0F172A !important;
+}
+
+html.dark #dinas-report-paper.real-paper-mode .text-slate-800 {
+    color: #1E293B !important;
+}
+
+html.dark #dinas-report-paper.real-paper-mode .text-slate-700 {
+    color: #334155 !important;
+}
+
+html.dark #dinas-report-paper.real-paper-mode .text-slate-600 {
+    color: #475569 !important;
+}
+
+html.dark #dinas-report-paper.real-paper-mode .text-slate-500 {
+    color: #64748B !important;
+}
+
+html.dark #dinas-report-paper.real-paper-mode .border-slate-300 {
+    border-color: #CBD5E1 !important;
+}
+
+html.dark #dinas-report-paper.real-paper-mode .border-slate-200 {
+    border-color: #E2E8F0 !important;
+}
+
+html.dark #dinas-report-paper.real-paper-mode .grid.grid-cols-4 {
+    background-color: #F8FAFC !important;
+    border-color: #E2E8F0 !important;
+}
+
+html.dark #dinas-report-paper.real-paper-mode .text-blue-800 {
+    color: #1E40AF !important;
+}
+
+html.dark #dinas-report-paper.real-paper-mode .text-emerald-800 {
+    color: #065F46 !important;
+}
+
+html.dark #dinas-report-paper.real-paper-mode .text-amber-800 {
+    color: #92400E !important;
+}
+
+html.dark #dinas-report-paper.real-paper-mode table {
+    border-color: #CBD5E1 !important;
+}
+
+html.dark #dinas-report-paper.real-paper-mode table thead tr {
+    background-color: #F1F5F9 !important;
+    border-color: #CBD5E1 !important;
+}
+
+html.dark #dinas-report-paper.real-paper-mode table th {
+    background-color: #F1F5F9 !important;
+    color: #1E293B !important;
+    border-color: #CBD5E1 !important;
+}
+
+html.dark #dinas-report-paper.real-paper-mode table td {
+    border-color: #CBD5E1 !important;
+    color: #1E293B !important;
+}
+
+html.dark #dinas-report-paper.real-paper-mode .whitespace-pre-line {
+    background-color: rgba(248, 250, 252, 0.7) !important;
+    border-color: #E2E8F0 !important;
+    color: #1E293B !important;
+}
+
+/* Badges Predikat (Real Paper Mode) */
+html.dark #dinas-report-paper.real-paper-mode .bg-emerald-100 {
+    background-color: #D1FAE5 !important;
+    color: #065F46 !important;
+    border-color: #A7F3D0 !important;
+}
+
+html.dark #dinas-report-paper.real-paper-mode .bg-blue-100 {
+    background-color: #DBEAFE !important;
+    color: #1E40AF !important;
+    border-color: #BFDBFE !important;
+}
+
+html.dark #dinas-report-paper.real-paper-mode .bg-amber-100 {
+    background-color: #FEF3C7 !important;
+    color: #92400E !important;
+    border-color: #FDE68A !important;
+}
+
+html.dark #dinas-report-paper.real-paper-mode .bg-rose-100 {
+    background-color: #FFE4E6 !important;
+    color: #9F1239 !important;
+    border-color: #FECDD3 !important;
 }
 
 

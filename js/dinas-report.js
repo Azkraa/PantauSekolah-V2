@@ -28,7 +28,8 @@ const DinasReportManager = {
         calculatedData: null,
         aiApiKey: "",
         aiModel: "openai/gpt-oss-120b",
-        isAiLoading: false
+        isAiLoading: false,
+        paperMode: "dark"
     },
 
     /**
@@ -57,6 +58,10 @@ const DinasReportManager = {
             if (saved) {
                 const parsed = JSON.parse(saved);
                 Object.assign(this.state, parsed);
+            }
+            const savedPaperMode = localStorage.getItem("pantausekolah_dinas_paper_mode");
+            if (savedPaperMode) {
+                this.state.paperMode = savedPaperMode === "white" ? "white" : "dark";
             }
             const savedKey = localStorage.getItem("pantausekolah_ai_api_key");
             if (savedKey) this.state.aiApiKey = savedKey.trim();
@@ -624,6 +629,48 @@ const DinasReportManager = {
                 </div>
             </div>
         `;
+
+        this.applyPaperModeUI();
+    },
+
+    /**
+     * Beralih tampilan lembar dokumen A4 (Mode Gelap vs Kertas Putih Asli)
+     */
+    setPaperMode(mode) {
+        this.state.paperMode = mode === "white" ? "white" : "dark";
+        try {
+            localStorage.setItem("pantausekolah_dinas_paper_mode", this.state.paperMode);
+        } catch (e) {}
+        this.applyPaperModeUI();
+    },
+
+    /**
+     * Terapkan kelas visual pada lembar dokumen & tombol switcher
+     */
+    applyPaperModeUI() {
+        const paper = document.getElementById("dinas-report-paper");
+        const btnDark = document.getElementById("btn-paper-dark");
+        const btnReal = document.getElementById("btn-paper-real");
+        if (!paper) return;
+
+        const isWhite = this.state.paperMode === "white";
+        if (isWhite) {
+            paper.classList.add("real-paper-mode");
+            if (btnReal) {
+                btnReal.className = "px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all flex items-center gap-1.5 bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm";
+            }
+            if (btnDark) {
+                btnDark.className = "px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all flex items-center gap-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200";
+            }
+        } else {
+            paper.classList.remove("real-paper-mode");
+            if (btnDark) {
+                btnDark.className = "px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all flex items-center gap-1.5 bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm";
+            }
+            if (btnReal) {
+                btnReal.className = "px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all flex items-center gap-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200";
+            }
+        }
     },
 
     /**
