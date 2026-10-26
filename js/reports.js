@@ -916,9 +916,11 @@ const ReportManager = {
 
         // Render Folder Guru yang ada di Database Folder_Drive
         uniqueCustomFolders.forEach(f => {
+            const targetF = f.namaFolder.trim().toLowerCase();
             const countCustom = schoolReports.filter(x => {
-                const repType = (x.jenisPelaporan || x.kategori || '').toLowerCase();
-                return repType.includes(f.namaFolder.toLowerCase());
+                const j = (x.jenisPelaporan || "").trim().toLowerCase();
+                const k = (x.kategori || "").trim().toLowerCase();
+                return j === targetF || k === targetF || j.includes(targetF) || k.includes(targetF) || targetF.includes(j) || targetF.includes(k);
             }).length;
 
             const safeFolderName = f.namaFolder.replace(/'/g, "\\'");
@@ -986,11 +988,15 @@ const ReportManager = {
     openSubFolderTable(type, subType) {
         this.selectedTypeState = subType;
 
-        document.getElementById(`subcards-container-${type}`).classList.add("hidden");
-        document.getElementById(`table-container-${type}`).classList.remove("hidden");
-
         const currentUser = typeof AuthService !== "undefined" ? AuthService.getUser() : null;
         const isGuru = currentUser && currentUser.role === "Guru";
+
+        if (!this.selectedSchoolState && currentUser && currentUser.asal_sekolah) {
+            this.selectedSchoolState = currentUser.asal_sekolah;
+        }
+
+        document.getElementById(`subcards-container-${type}`).classList.add("hidden");
+        document.getElementById(`table-container-${type}`).classList.remove("hidden");
 
         const titleEl = document.getElementById(`table-title-${type}`);
         if (titleEl) {
@@ -1000,11 +1006,15 @@ const ReportManager = {
         }
 
         const tbody = document.getElementById(`table-body-${type}`);
-        const rawData = (type === 'kepsek') ? DashboardManager.cachedData.reportsKepsek : DashboardManager.cachedData.reportsGuru;
+        const liveSource = (typeof LiveSync !== "undefined" && LiveSync.state) ? LiveSync.state : null;
+        const rawData = (liveSource && Array.isArray(liveSource[type === 'kepsek' ? 'reportsKepsek' : 'reportsGuru']))
+            ? liveSource[type === 'kepsek' ? 'reportsKepsek' : 'reportsGuru']
+            : ((type === 'kepsek') ? DashboardManager.cachedData.reportsKepsek : DashboardManager.cachedData.reportsGuru);
         const targetSheet = (type === 'kepsek') ? "Laporan_Kepsek" : "Laporan_Guru";
 
         const filteredData = rawData.filter(x => {
-            const matchSchool = (x.asalSekolah || "").toLowerCase() === this.selectedSchoolState.toLowerCase();
+            const currentSelectedSchool = (this.selectedSchoolState || (currentUser ? currentUser.asal_sekolah : "") || "").trim().toLowerCase();
+            const matchSchool = (x.asalSekolah || "").trim().toLowerCase() === currentSelectedSchool;
             if (!matchSchool) return false;
 
             // Jika Guru: HANYA tampilkan berkas milik guru itu sendiri (Owner Only)
@@ -1015,7 +1025,7 @@ const ReportManager = {
             }
 
             const reportType = (x.jenisPelaporan || x.kategori || '').toLowerCase();
-            const targetSubType = subType.toLowerCase();
+            const targetSubType = subType.trim().toLowerCase();
 
             if (targetSubType === "daring") {
                 return reportType.includes("daring");
@@ -1024,7 +1034,9 @@ const ReportManager = {
             } else if (targetSubType === "laporan kepala sekolah") {
                 return reportType.includes("laporan kepala sekolah") || reportType.includes("manajerial") || reportType.includes("kewirausahaan") || reportType.includes("supervisi") || !x.jenisPelaporan;
             } else {
-                return reportType.includes(targetSubType);
+                const j = (x.jenisPelaporan || "").trim().toLowerCase();
+                const k = (x.kategori || "").trim().toLowerCase();
+                return j === targetSubType || k === targetSubType || j.includes(targetSubType) || k.includes(targetSubType) || targetSubType.includes(j) || targetSubType.includes(k);
             }
         });
 
@@ -1038,7 +1050,7 @@ const ReportManager = {
             const driveUrl = matchedFolder ? matchedFolder.driveFolderUrl : "";
 
             const emptyMsg = (isGuru && type === 'guru')
-                ? `Anda belum mengunggah berkas untuk <strong>Laporan ${subType}</strong>.`
+                ? `Tidak ada berkas laporan untuk <strong>Laporan ${subType}</strong> (Belum diunggah atau telah dihapus).`
                 : `Belum ada berkas untuk <strong>Laporan ${subType}</strong> di sekolah ini.`;
 
             tbody.innerHTML = `
@@ -1138,6 +1150,13 @@ const ReportManager = {
         });
 
         this.updateBulkBar(type);
+
+        // Pastikan verifikasi kesegaran data dengan server saat tabel dibuka
+        if (typeof LiveSync !== "undefined" && typeof LiveSync.sync === "function") {
+            setTimeout(() => {
+                LiveSync.sync({ silent: true });
+            }, 100);
+        }
     },
 
     toggleSelectAll(type, masterCb) {

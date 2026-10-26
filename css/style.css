@@ -417,3 +417,94 @@ html.dark .glass-effect {
     border-color: rgba(255, 255, 255, 0.1) !important;
 }
 
+/* 13. Elemen Status Pills, KPI, & Kartu Perhatian (Dark Mode Polish) */
+html.dark [class*="bg-emerald-50"] {
+    background-color: rgba(6, 78, 59, 0.25) !important;
+    border-color: rgba(16, 185, 129, 0.35) !important;
+}
+html.dark [class*="text-emerald-800"],
+html.dark [class*="text-emerald-700"],
+html.dark [class*="text-emerald-600"] {
+    color: #34D399 !important;
+}
+
+html.dark [class*="bg-blue-50"] {
+    background-color: rgba(30, 58, 138, 0.25) !important;
+    border-color: rgba(59, 130, 246, 0.35) !important;
+}
+html.dark [class*="text-blue-800"],
+html.dark [class*="text-blue-700"],
+html.dark [class*="text-blue-600"] {
+    color: #60A5FA !important;
+}
+
+html.dark [class*="bg-amber-50"] {
+    background-color: rgba(120, 53, 15, 0.25) !important;
+    border-color: rgba(245, 158, 11, 0.35) !important;
+}
+html.dark [class*="text-amber-800"],
+html.dark [class*="text-amber-700"],
+html.dark [class*="text-amber-600"] {
+    color: #FBBF24 !important;
+}
+
+html.dark [class*="bg-rose-50"] {
+    background-color: rgba(136, 19, 55, 0.25) !important;
+    border-color: rgba(244, 63, 94, 0.35) !important;
+}
+html.dark [class*="text-rose-800"],
+html.dark [class*="text-rose-700"],
+html.dark [class*="text-rose-600"] {
+    color: #FB7185 !important;
+}
+
+html.dark [class*="bg-indigo-50"] {
+    background-color: rgba(49, 46, 129, 0.25) !important;
+    border-color: rgba(99, 102, 241, 0.35) !important;
+}
+html.dark [class*="text-indigo-600"] {
+    color: #818CF8 !important;
+}
+
+/* Badge di dalam Card Status / Alert */
+html.dark [class*="bg-amber-50"] .bg-white,
+html.dark [class*="bg-emerald-50"] .bg-white,
+html.dark [class*="bg-blue-50"] .bg-white,
+html.dark [class*="bg-rose-50"] .bg-white {
+    background-color: rgba(15, 23, 42, 0.75) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Badge Total Berkas di Card Chart Status */
+html.dark #chart-status-total-badge {
+    background-color: #1E293B !important;
+    color: #CBD5E1 !important;
+    border-color: #334155 !important;
+}
+
+/* Badge Status Laporan di Tabel & Kartu */
+html.dark .status-badge-disetujui {
+    background-color: rgba(16, 185, 129, 0.15) !important;
+    color: #34D399 !important;
+    border-color: rgba(16, 185, 129, 0.3) !important;
+}
+
+html.dark .status-badge-menunggu {
+    background-color: rgba(59, 130, 246, 0.15) !important;
+    color: #60A5FA !important;
+    border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
+html.dark .status-badge-perbaikan {
+    background-color: rgba(245, 158, 11, 0.15) !important;
+    color: #FBBF24 !important;
+    border-color: rgba(245, 158, 11, 0.3) !important;
+}
+
+html.dark .status-badge-ditolak {
+    background-color: rgba(239, 68, 68, 0.15) !important;
+    color: #F87171 !important;
+    border-color: rgba(239, 68, 68, 0.3) !important;
+}
+
+

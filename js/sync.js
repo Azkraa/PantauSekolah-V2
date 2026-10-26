@@ -480,15 +480,21 @@ const LiveSync = {
             // Segarkan tabel subfolder HANYA JIKA pengguna memang sedang aktif membuka tabel tersebut
             const activeTabKepsek = document.getElementById("tab-verifikasi-kepsek");
             const isTabKepsekActive = activeTabKepsek && !activeTabKepsek.classList.contains("hidden");
-            const targetType = isTabKepsekActive ? "kepsek" : "guru";
-            const tableContainer = document.getElementById(`table-container-${targetType}`);
-            const isTableVisible = tableContainer && !tableContainer.classList.contains("hidden");
+            const activeTabGuru = document.getElementById("tab-verifikasi-guru");
+            const isTabGuruActive = activeTabGuru && !activeTabGuru.classList.contains("hidden");
 
-            if (isTableVisible && ReportManager.selectedTypeState && targetGuruSchool) {
-                ReportManager.renderSubFolderTable(targetType, ReportManager.selectedTypeState);
-            } else if (!isTableVisible) {
-                // Jika tabel sedang tertutup (menampilkan kartu folder), pastikan selectedTypeState kosong agar tidak auto-open
-                ReportManager.selectedTypeState = "";
+            if (isTabKepsekActive) {
+                const tableContainerKepsek = document.getElementById("table-container-kepsek");
+                if (tableContainerKepsek && !tableContainerKepsek.classList.contains("hidden") && ReportManager.selectedTypeState) {
+                    ReportManager.renderSubFolderTable("kepsek", ReportManager.selectedTypeState);
+                }
+            }
+
+            if (isTabGuruActive) {
+                const tableContainerGuru = document.getElementById("table-container-guru");
+                if (tableContainerGuru && !tableContainerGuru.classList.contains("hidden") && ReportManager.selectedTypeState) {
+                    ReportManager.renderSubFolderTable("guru", ReportManager.selectedTypeState);
+                }
             }
         }
 
