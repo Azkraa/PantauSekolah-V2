@@ -270,56 +270,61 @@ html.dark {
     color-scheme: dark;
 }
 
-html.dark body {
+/* 1. Latar Belakang Utama Halaman & Kontainer Utama */
+html.dark,
+html.dark body,
+html.dark #dashboard-section,
+html.dark main,
+html.dark .bg-beige-main,
+html.dark [class*="bg-[#F6F3EC]"] {
     background-color: #0B0F17 !important;
     color: #F1F5F9 !important;
 }
 
-/* Main background & content area */
-html.dark #dashboard-section,
-html.dark main,
-html.dark .bg-[#F6F3EC],
-html.dark .bg-beige-main {
-    background-color: #0B0F17 !important;
-}
-
-/* Top Navbar */
-html.dark header.bg-\[\#FAF8F5\]\/95,
-html.dark header {
+/* 2. Top Header & Sticky Navbar */
+html.dark header,
+html.dark [class*="bg-[#FAF8F5]"] {
     background-color: rgba(15, 23, 42, 0.95) !important;
     border-color: #1E293B !important;
 }
 
-/* White cards, panels & modals */
+/* 3. Kartu Putih, Panel, Modal, Popup */
 html.dark .bg-white,
 html.dark .bg-beige-card {
     background-color: #151D2C !important;
     border-color: #243044 !important;
-    color: #F1F5F9;
+    color: #F1F5F9 !important;
 }
 
-/* Secondary beige subtle containers & inputs */
-html.dark .bg-[#FAF8F5],
-html.dark .bg-[#FAF7F0],
-html.dark .bg-[#F8F6F0],
-html.dark .bg-[#F0EBE1],
-html.dark .bg-[#EFE9DC],
-html.dark .bg-beige-header {
-    background-color: #1B2436 !important;
-    border-color: #2D3D56 !important;
-}
-
+/* 4. Sub-Container Beige & Slate */
+html.dark [class*="bg-[#FAF7F0]"],
+html.dark [class*="bg-[#F8F6F0]"],
 html.dark .bg-slate-50,
 html.dark .bg-slate-100 {
-    background-color: #1B2436 !important;
-    border-color: #2D3D56 !important;
+    background-color: #172030 !important;
+    border-color: #243044 !important;
 }
 
-/* Borders */
-html.dark .border-[#E8E2D5],
-html.dark .border-[#F0EBE1],
-html.dark .border-[#DCD5C7],
-html.dark .border-[#E0D7C5],
+/* Tombol dan Tag Beige Netral */
+html.dark [class*="bg-[#F0EBE1]"],
+html.dark [class*="bg-[#EFE9DC]"],
+html.dark [class*="bg-[#E5DFD3]"],
+html.dark .bg-beige-header {
+    background-color: #1E293B !important;
+    color: #F8FAFC !important;
+    border-color: #334155 !important;
+}
+
+html.dark [class*="hover:bg-[#E5DFD3]"]:hover,
+html.dark [class*="hover:bg-[#FAF8F5]"]:hover {
+    background-color: #28374D !important;
+}
+
+/* 5. Garis Pembatas (Borders) */
+html.dark [class*="border-[#E8E2D5]"],
+html.dark [class*="border-[#F0EBE1]"],
+html.dark [class*="border-[#DCD5C7]"],
+html.dark [class*="border-[#E0D7C5]"],
 html.dark .border-beige-custom,
 html.dark .border-beige-light,
 html.dark .border-slate-100,
@@ -327,7 +332,7 @@ html.dark .border-slate-200 {
     border-color: #243044 !important;
 }
 
-/* Typography contrast adjustments */
+/* 6. Penyesuaian Kontras Tipografi */
 html.dark .text-slate-800,
 html.dark .text-slate-700,
 html.dark #page-title {
@@ -347,9 +352,9 @@ html.dark .text-slate-400 {
     color: #64748B !important;
 }
 
-/* Custom Table in Dark Mode */
+/* 7. Tabel Kustom (Custom Table) */
 html.dark .custom-table th {
-    background-color: #1B2436 !important;
+    background-color: #172030 !important;
     color: #94A3B8 !important;
     border-bottom: 2px solid #243044 !important;
 }
@@ -364,7 +369,7 @@ html.dark .hover-beige-row:hover {
     background-color: #1E2B3E !important;
 }
 
-/* Form Inputs, Selects, Textareas */
+/* 8. Input Formulir, Select, Textarea */
 html.dark input:not([type="checkbox"]):not([type="radio"]),
 html.dark select,
 html.dark textarea {
@@ -378,7 +383,7 @@ html.dark textarea::placeholder {
     color: #64748B !important;
 }
 
-/* Dark Mode Toggle Button */
+/* 9. Tombol Toggle Tema */
 html.dark .theme-toggle-btn {
     background-color: #1E293B !important;
     border-color: #334155 !important;
@@ -388,7 +393,7 @@ html.dark .theme-toggle-btn:hover {
     background-color: #27354E !important;
 }
 
-/* Scrollbar in Dark Mode */
+/* 10. Scrollbar Mode Gelap */
 html.dark ::-webkit-scrollbar-track {
     background: #0B0F17 !important;
 }
@@ -401,14 +406,14 @@ html.dark ::-webkit-scrollbar-thumb:hover {
     background: #3B4D68 !important;
 }
 
-/* Badges & Pills */
+/* 11. Badges & Live Sync */
 html.dark #sync-live-text {
     color: #94A3B8 !important;
 }
 
-/* Modals & Popups Glass Background */
+/* 12. Modal & Dialog Popups */
 html.dark .glass-effect {
-    background: rgba(21, 29, 44, 0.95) !important;
+    background: rgba(21, 29, 44, 0.98) !important;
     border-color: rgba(255, 255, 255, 0.1) !important;
 }
 

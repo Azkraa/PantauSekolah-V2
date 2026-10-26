@@ -26,7 +26,7 @@
     <!-- SheetJS (XLSX) untuk Export & Import Excel Template -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- Custom Stylesheet (Warm Beige & Dark Mode Edition) -->
-    <link rel="stylesheet" href="css/style.css?v=2.8.0">
+    <link rel="stylesheet" href="css/style.css?v=2.8.2">
 
     <!-- Immediate Session & Theme Checker (Mencegah flicker saat refresh) -->
     <script>
@@ -59,7 +59,7 @@
     </style>
 </head>
 
-<body class="bg-[#F6F3EC] text-slate-800 min-h-screen relative overflow-x-hidden font-sans">
+<body class="bg-[#F6F3EC] dark:bg-[#0B0F17] text-slate-800 dark:text-slate-100 min-h-screen relative overflow-x-hidden font-sans">
 
     <!-- TOAST CONTAINER RESPONSIVE -->
     <div id="toast-container"
@@ -1154,7 +1154,7 @@
     <!-- ==================================================================== -->
     <!-- MAIN APPLICATION WRAPPER                                             -->
     <!-- ==================================================================== -->
-    <div id="dashboard-section" class="hidden w-full flex flex-col md:flex-row min-h-screen bg-[#F6F3EC]">
+    <div id="dashboard-section" class="hidden w-full flex flex-col md:flex-row min-h-screen bg-[#F6F3EC] dark:bg-[#0B0F17]">
 
         <!-- SIDEBAR -->
         <aside id="main-sidebar"
@@ -1319,11 +1319,11 @@
         </aside>
 
         <!-- MAIN CONTENT AREA -->
-        <main class="flex-1 bg-[#F6F3EC] flex flex-col min-w-0 h-screen overflow-y-auto">
+        <main class="flex-1 bg-[#F6F3EC] dark:bg-[#0B0F17] flex flex-col min-w-0 h-screen overflow-y-auto">
 
             <!-- TOP NAVBAR -->
             <header
-                class="bg-[#FAF8F5]/95 backdrop-blur-md border-b border-[#E8E2D5] px-4 sm:px-6 py-3.5 sticky top-0 z-20 flex justify-between items-center shadow-xs gap-2">
+                class="bg-[#FAF8F5]/95 dark:bg-[#0F172A]/95 backdrop-blur-md border-b border-[#E8E2D5] dark:border-slate-800 px-4 sm:px-6 py-3.5 sticky top-0 z-20 flex justify-between items-center shadow-xs gap-2">
                 <div class="flex items-center gap-3 min-w-0">
                     <button onclick="App.toggleMobileSidebar()"
                         class="md:hidden bg-[#F0EBE1] text-slate-700 p-2 rounded-xl text-sm hover:bg-[#E5DFD3] transition-colors flex-shrink-0">
