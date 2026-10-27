@@ -76,8 +76,6 @@
     <style>
         html.has-session #login-section { display: none !important; }
         html.has-session #dashboard-section { display: flex !important; }
-        html:not(.has-session) #ai-chat-launcher,
-        html:not(.has-session) #ai-chat-window { display: none !important; }
     </style>
 </head>
 
@@ -1350,7 +1348,7 @@
                             <span class="truncate">Audit Log Aktivitas</span>
                         </button>
 
-                        <button onclick="AIAssistant.toggleChat(true)" id="nav-ai-assistant"
+                        <button onclick="App.switchTab('ai-assistant')" id="nav-ai-assistant"
                             class="sidebar-nav-btn group w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition-all">
                             <div class="nav-icon-box w-7 h-7 rounded-lg bg-indigo-500/15 text-indigo-400 flex items-center justify-center text-xs flex-shrink-0 group-hover:scale-110 transition-transform">
                                 <i class="fa-solid fa-wand-magic-sparkles"></i>
@@ -2731,153 +2729,154 @@
                     </div>
                 </div>
 
+                <!-- 8. TAB ASISTEN AI & KONSULTASI EDUKASI (SEMUA ROLE) -->
+                <div id="tab-ai-assistant" class="hidden space-y-5 sm:space-y-6">
+                    <!-- Banner Header Modul -->
+                    <div class="bg-white dark:bg-[#11141D] p-5 sm:p-6 rounded-2xl border border-[#E8E2D5] dark:border-slate-800 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div class="flex items-center gap-3.5 min-w-0">
+                            <div class="w-12 h-12 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-800/60 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center text-2xl font-bold flex-shrink-0 shadow-sm shadow-indigo-500/10">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <h3 class="font-extrabold text-slate-800 dark:text-slate-100 text-base sm:text-lg">Modul Asisten AI & Konsultasi Edukasi</h3>
+                                    <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 flex items-center gap-1">
+                                        <i class="fa-solid fa-robot text-[10px]"></i> PantauBot AI
+                                    </span>
+                                    <span id="ai-model-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                        GPT OSS 120B
+                                    </span>
+                                </div>
+                                <p class="text-xs text-slate-400 mt-0.5">Analisis kepatuhan berbasis grafik visual interaktif, draf naskah resmi, instrumen supervisi, dan ekspor instan Word & PDF</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 flex-wrap self-start md:self-auto">
+                            <button onclick="AIAssistant.clearChat()" title="Kosongkan Riwayat Obrolan"
+                                class="inline-flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 dark:bg-rose-950/30 dark:hover:bg-rose-950/50 dark:text-rose-400 rounded-xl text-xs font-bold border border-rose-200 dark:border-rose-800 transition-all shadow-2xs">
+                                <i class="fa-solid fa-broom text-xs"></i> Bersihkan Obrolan
+                            </button>
+                            <button onclick="AIAssistant.toggleSettingsModal(true)" title="Pengaturan Model AI"
+                                class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#FAF7F0] dark:bg-slate-800 hover:bg-[#F0EBE1] dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold border border-[#E0D7C5] dark:border-slate-700 transition-all shadow-2xs">
+                                <i class="fa-solid fa-sliders text-xs"></i> Pengaturan AI
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 4 Kartu Aksi Cepat / Quick Prompt Cards -->
+                    <div id="ai-action-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+                        <!-- Dimuat otomatis via AIAssistant.renderActionCards() -->
+                    </div>
+
+                    <!-- Workspace Modul AI (Area Obrolan & Dokumen) -->
+                    <div class="bg-white dark:bg-[#11141D] rounded-2xl border border-[#E8E2D5] dark:border-slate-800 shadow-xs flex flex-col overflow-hidden min-h-[620px]">
+                        <!-- Top Bar Status & Ekspor Info -->
+                        <div class="px-5 py-3.5 border-b border-[#F0EBE1] dark:border-slate-800 bg-[#FAF8F5]/90 dark:bg-slate-900/60 flex items-center justify-between flex-wrap gap-2">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <span class="text-xs font-bold text-slate-700 dark:text-slate-200" id="ai-workspace-status">Kanal Konsultasi AI Aktif & Terhubung</span>
+                            </div>
+                            <div class="text-[11px] text-slate-400 flex items-center gap-3 flex-wrap">
+                                <span class="flex items-center gap-1"><i class="fa-solid fa-chart-pie text-emerald-500"></i>Grafik Analisis Visual</span>
+                                <span class="flex items-center gap-1"><i class="fa-solid fa-file-word text-blue-500"></i>Ekspor Microsoft Word (.doc)</span>
+                                <span class="flex items-center gap-1"><i class="fa-solid fa-file-pdf text-rose-500"></i>Ekspor PDF Resmi</span>
+                            </div>
+                        </div>
+
+                        <!-- Chat Message Thread Stream -->
+                        <div id="ai-module-chat-thread" class="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 max-h-[720px] scroll-smooth">
+                            <!-- Messages & Documents dynamically rendered by AIAssistant.renderMessages() -->
+                        </div>
+
+                        <!-- Chat Input Box (Fixed at bottom of module card) -->
+                        <div class="p-4 sm:p-5 border-t border-[#F0EBE1] dark:border-slate-800 bg-[#FAF8F5] dark:bg-slate-900/80">
+                            <form onsubmit="event.preventDefault(); AIAssistant.handleModuleSend();" class="space-y-3">
+                                <div class="relative">
+                                    <textarea id="ai-module-input" rows="2"
+                                        placeholder="Ketik pertanyaan kurikulum, instruksi analisis data sekolah, atau permintaan draf naskah/modul di sini..."
+                                        class="w-full px-4 py-3 rounded-xl border border-[#E8E2D5] dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder-slate-400 text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none leading-relaxed shadow-2xs"></textarea>
+                                </div>
+                                <div class="flex items-center justify-between flex-wrap gap-2">
+                                    <div class="text-[11px] text-slate-400 hidden sm:flex items-center gap-2">
+                                        <span class="inline-flex items-center gap-1"><kbd class="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-mono">Enter</kbd> kirim pesan</span>
+                                        <span>•</span>
+                                        <span class="inline-flex items-center gap-1"><kbd class="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[10px] font-mono">Shift+Enter</kbd> baris baru</span>
+                                    </div>
+                                    <div class="flex items-center gap-2 ml-auto">
+                                        <button type="submit" id="ai-module-btn-send"
+                                            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs sm:text-sm shadow-md shadow-indigo-600/25 transition-all active:scale-95 disabled:opacity-50">
+                                            <i class="fa-solid fa-paper-plane"></i>
+                                            <span>Kirim Instruksi</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Modal Pengaturan AI Model & API Key -->
+                    <div id="modal-ai-settings" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+                        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-md w-full p-5 space-y-4">
+                            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                                <h4 class="text-sm font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                                    <i class="fa-solid fa-sliders text-indigo-600"></i> Pengaturan Model & API AI
+                                </h4>
+                                <button onclick="AIAssistant.toggleSettingsModal(false)" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                        API Key (Opsional, Default Backend sudah aktif):
+                                    </label>
+                                    <input type="password" id="ai-modal-api-key" placeholder="Kunci default backend sudah tertanam dan aktif"
+                                        class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                                    <p class="text-[10px] text-slate-400 mt-1">Biarkan kosong untuk menggunakan kunci default backend.</p>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                                        Pilihan Model AI:
+                                    </label>
+                                    <select id="ai-modal-model"
+                                        class="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                                        <option value="openai/gpt-oss-120b">GPT OSS 120B (Default Cerdas & Analitis)</option>
+                                        <option value="google/gemini-2.0-flash-exp:free">Gemini 2.0 Flash (Cepat & Ringan)</option>
+                                        <option value="meta-llama/llama-3.3-70b-instruct:free">Llama 3.3 70B Instruct</option>
+                                        <option value="gemini-1.5-flash">Google Gemini 1.5 Flash (Direct)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                                <button type="button" onclick="AIAssistant.toggleSettingsModal(false)"
+                                    class="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-semibold text-xs hover:bg-slate-50 dark:hover:bg-slate-800">
+                                    Batal
+                                </button>
+                                <button type="button" onclick="AIAssistant.saveModalSettings()"
+                                    class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-sm">
+                                    Simpan Perubahan
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </main>
     </div>
 
-    <!-- ===================================================================== -->
-    <!-- FLOATING AI CHAT ASSISTANT WIDGET (PANTAUBOT AI)                      -->
-    <!-- ===================================================================== -->
-
-    <!-- 1. Floating Launcher Button -->
-    <div id="ai-chat-launcher" onclick="AIAssistant.toggleChat()"
-        class="fixed bottom-5 right-5 z-40 flex items-center gap-2.5 px-4 py-3 bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-full shadow-xl shadow-indigo-600/30 hover:shadow-indigo-600/50 cursor-pointer transition-all duration-300 transform hover:scale-105 active:scale-95 group border border-white/20 select-none">
-        <div class="relative flex items-center justify-center">
-            <i class="fa-solid fa-wand-magic-sparkles text-base group-hover:rotate-12 transition-transform duration-300"></i>
-            <span class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-indigo-700 animate-pulse"></span>
-        </div>
-        <span class="text-xs font-bold tracking-wide hidden sm:inline-block">Tanya AI</span>
-    </div>
-
-    <!-- 2. Floating AI Chat Window -->
-    <div id="ai-chat-window"
-        class="hidden opacity-0 scale-95 pointer-events-none fixed bottom-20 right-4 sm:right-6 z-45 w-[94vw] sm:w-[440px] md:w-[480px] h-[600px] max-h-[82vh] bg-white/95 dark:bg-[#11141D]/95 backdrop-blur-xl border border-slate-200/90 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300">
-        
-        <!-- Header -->
-        <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-800/80 bg-slate-50/80 dark:bg-[#161B26]/80 flex items-center justify-between flex-shrink-0">
-            <div class="flex items-center gap-2.5 min-w-0">
-                <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center text-sm shadow-md shadow-indigo-500/20 flex-shrink-0">
-                    <i class="fa-solid fa-robot"></i>
-                </div>
-                <div class="min-w-0">
-                    <div class="flex items-center gap-1.5">
-                        <h4 class="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">PantauBot AI</h4>
-                        <span class="inline-flex items-center px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">Online</span>
-                    </div>
-                    <p class="text-[10px] text-slate-400 dark:text-slate-400 truncate">Asisten Edukasi & Pengawasan</p>
-                </div>
-            </div>
-
-            <!-- Header Action Buttons -->
-            <div class="flex items-center gap-1 flex-shrink-0">
-                <!-- Settings Button -->
-                <button type="button" onclick="AIAssistant.toggleSettings()" title="Pengaturan Model & API Key"
-                    class="w-7 h-7 rounded-lg text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 flex items-center justify-center transition-colors">
-                    <i class="fa-solid fa-gear text-xs"></i>
-                </button>
-                <!-- Clear Button -->
-                <button type="button" onclick="AIAssistant.clearChat()" title="Hapus Riwayat Obrolan"
-                    class="w-7 h-7 rounded-lg text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 flex items-center justify-center transition-colors">
-                    <i class="fa-solid fa-broom text-xs"></i>
-                </button>
-                <!-- Maximize Button -->
-                <button type="button" id="ai-btn-maximize" onclick="AIAssistant.toggleMaximize()" title="Perbesar / Perkecil"
-                    class="hidden sm:flex w-7 h-7 rounded-lg text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 items-center justify-center transition-colors">
-                    <i class="fa-solid fa-expand text-xs"></i>
-                </button>
-                <!-- Close Button -->
-                <button type="button" onclick="AIAssistant.toggleChat(false)" title="Tutup Jendela"
-                    class="w-7 h-7 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800 flex items-center justify-center transition-colors">
-                    <i class="fa-solid fa-xmark text-sm"></i>
-                </button>
-            </div>
-        </div>
-
-        <!-- Settings Drawer (Toggleable) -->
-        <div id="ai-settings-drawer" class="hidden px-4 py-3 bg-indigo-50/90 dark:bg-slate-800/95 border-b border-indigo-100 dark:border-slate-700 text-xs flex-shrink-0">
-            <div class="space-y-2.5">
-                <div class="flex items-center justify-between">
-                    <span class="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                        <i class="fa-solid fa-sliders text-indigo-500"></i> Pengaturan Kunci AI
-                    </span>
-                    <button type="button" onclick="AIAssistant.toggleSettings(false)" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                        <i class="fa-solid fa-xmark"></i>
-                    </button>
-                </div>
-                <div>
-                    <label class="block text-[10px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                        API Key (OpenRouter atau Google Gemini API):
-                    </label>
-                    <input type="password" id="ai-cfg-api-key" placeholder="Masukkan sk-or-... atau AIzaSy..."
-                        class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                    <span class="text-[9px] text-slate-400 dark:text-slate-400 mt-0.5 block">
-                        Kunci OpenRouter (openrouter.ai/keys) atau Google Gemini gratis (aistudio.google.com).
-                    </span>
-                </div>
-                <div>
-                    <label class="block text-[10px] font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                        Model AI:
-                    </label>
-                    <select id="ai-cfg-model"
-                        class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                        <option value="openai/gpt-oss-120b">GPT OSS 120B (OpenRouter Default)</option>
-                        <option value="google/gemini-2.0-flash-exp:free">Gemini 2.0 Flash (OpenRouter Free)</option>
-                        <option value="meta-llama/llama-3.3-70b-instruct:free">Llama 3.3 70B (OpenRouter Free)</option>
-                        <option value="gemini-1.5-flash">Google Gemini 1.5 Flash (Direct API)</option>
-                        <option value="gemini-2.0-flash">Google Gemini 2.0 Flash (Direct API)</option>
-                    </select>
-                </div>
-                <div class="flex justify-end pt-1">
-                    <button type="button" onclick="AIAssistant.saveSettings()"
-                        class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition-colors flex items-center gap-1.5">
-                        <i class="fa-solid fa-floppy-disk"></i> Simpan Pengaturan
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Quick Prompts Pill Bar -->
-        <div id="ai-quick-prompts-container" class="border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/40 flex-shrink-0"></div>
-
-        <!-- Messages Area -->
-        <div id="ai-chat-messages" class="flex-1 overflow-y-auto p-4 space-y-1 scroll-smooth">
-            <!-- Dynamic Messages Rendered by AIAssistant.renderMessages() -->
-        </div>
-
-        <!-- Chat Input Footer -->
-        <div class="p-3 border-t border-slate-200 dark:border-slate-800/80 bg-white/90 dark:bg-[#161B26]/90 flex-shrink-0">
-            <form onsubmit="event.preventDefault(); AIAssistant.handleSend();" class="flex items-end gap-2">
-                <div class="flex-1 relative">
-                    <textarea id="ai-chat-input" rows="1" placeholder="Tanya apa saja seputar kurikulum, supervisi, atau data sekolah..."
-                        class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 placeholder-slate-400 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none max-h-28 leading-relaxed"></textarea>
-                </div>
-                <button type="submit" id="ai-btn-send"
-                    class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white flex items-center justify-center text-xs shadow-md shadow-indigo-600/30 transition-all flex-shrink-0 active:scale-95 disabled:opacity-50">
-                    <i class="fa-solid fa-paper-plane"></i>
-                </button>
-            </form>
-            <div class="flex items-center justify-between text-[10px] text-slate-400 mt-1.5 px-1">
-                <span>Shift+Enter untuk baris baru</span>
-                <span class="flex items-center gap-1">
-                    <i class="fa-solid fa-shield-halved text-[9px] text-indigo-400"></i> PantauBot v2.8
-                </span>
-            </div>
-        </div>
-    </div>
-
     <!-- SCRIPT DEPENDENCIES (MODULAR LOAD ORDER) -->
-    <script src="js/config.js?v=2.8.8"></script>
-    <script src="js/api.js?v=2.8.8"></script>
-    <script src="js/auth.js?v=2.8.8"></script>
-    <script src="js/sync.js?v=2.8.8"></script>
-    <script src="js/users.js?v=2.8.8"></script>
-    <script src="js/drive.js?v=2.8.8"></script>
-    <script src="js/reports.js?v=2.8.8"></script>
-    <script src="js/dashboard.js?v=2.8.8"></script>
-    <script src="js/audit.js?v=2.8.8"></script>
-    <script src="js/dinas-report.js?v=2.8.8"></script>
-    <script src="js/ai-assistant.js?v=2.8.8"></script>
-    <script src="js/app.js?v=2.8.8"></script>
+    <script src="js/config.js?v=2.8.9"></script>
+    <script src="js/api.js?v=2.8.9"></script>
+    <script src="js/auth.js?v=2.8.9"></script>
+    <script src="js/sync.js?v=2.8.9"></script>
+    <script src="js/users.js?v=2.8.9"></script>
+    <script src="js/drive.js?v=2.8.9"></script>
+    <script src="js/reports.js?v=2.8.9"></script>
+    <script src="js/dashboard.js?v=2.8.9"></script>
+    <script src="js/audit.js?v=2.8.9"></script>
+    <script src="js/dinas-report.js?v=2.8.9"></script>
+    <script src="js/ai-assistant.js?v=2.8.9"></script>
+    <script src="js/app.js?v=2.8.9"></script>
 </body>
 
 </html>

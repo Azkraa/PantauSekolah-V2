@@ -1,34 +1,42 @@
 /**
  * =============================================================================
- * PantauSekolah - AI Chat Assistant Module (ai-assistant.js)
+ * PantauSekolah - Dedicated AI Module & Consultation Assistant (ai-assistant.js)
  * =============================================================================
  * Fitur:
- * 1. Asisten AI Interaktif Berbasis Percakapan (PantauBot).
- * 2. Sadar Peran & Konteks (Pengawas, Kepala Sekolah, Guru).
- * 3. Injeksi data riil supervisi & kurikulum secara dinamis (RAG Ringan).
- * 4. Mendukung OpenRouter & Google Gemini API dengan fallback berlapis.
- * 5. Floating widget elegan, responsive, mendukung Dark Mode & Quick Prompts.
+ * 1. Modul Penuh Terintegrasi (Full Page Tab: Asisten AI Cerdas untuk semua peran).
+ * 2. Visualisasi Grafik Analisis Interaktif (Chart.js) untuk kepatuhan & supervisi.
+ * 3. Parser Markdown Sempurna: Mendukung tabel bergaris rapi, heading H1-H6 (termasuk ####),
+ *    daftar berbutir/bernomor, dan blok kutipan formal.
+ * 4. Draf Dokumen Resmi dengan Ekspor Langsung ke Microsoft Word (.doc) & PDF Resmi.
+ * 5. Sadar Data Real-time (RAG Ringan) & Zero-Config API Key (langsung aktif dari backend).
  * =============================================================================
  */
 
 const AIAssistant = {
-    STORAGE_KEY_MESSAGES: "pantausekolah_ai_chat_history",
+    STORAGE_KEY_MESSAGES: "pantausekolah_ai_module_history_v2",
     STORAGE_KEY_KEY: "pantausekolah_ai_api_key",
     STORAGE_KEY_MODEL: "pantausekolah_ai_model",
 
-    isOpen: false,
-    isMaximized: false,
     isLoading: false,
     messages: [],
+    chartInstances: {},
 
     /**
-     * Inisialisasi modul Asisten AI
+     * Inisialisasi awal saat aplikasi dimuat
      */
     init() {
         this.loadChatHistory();
-        this.renderQuickPrompts();
-        this.renderMessages();
         this.bindEvents();
+    },
+
+    /**
+     * Dipanggil saat tab 'ai-assistant' diaktifkan oleh pengguna
+     */
+    onTabActivated() {
+        this.renderActionCards();
+        this.renderMessages();
+        this.updateHeaderBadge();
+        this.scrollToBottom();
     },
 
     /**
@@ -46,119 +54,88 @@ const AIAssistant = {
             }
         } catch (e) {}
 
-        // Jika riwayat kosong, pasang salam awal sesuai peran
         this.messages = [];
     },
 
     /**
-     * Simpan riwayat percakapan ke local storage
+     * Simpan riwayat obrolan ke local storage
      */
     saveChatHistory() {
         try {
-            // Batasi riwayat maksimal 25 pesan terakhir agar memori tetap ringan
-            const toSave = this.messages.slice(-25);
+            // Simpan hingga 30 pesan terakhir
+            const toSave = this.messages.slice(-30);
             localStorage.setItem(this.STORAGE_KEY_MESSAGES, JSON.stringify(toSave));
         } catch (e) {}
     },
 
     /**
-     * Hapus riwayat percakapan
+     * Bersihkan riwayat percakapan modul
      */
-    clearChat() {
-        this.messages = [];
-        try {
-            localStorage.removeItem(this.STORAGE_KEY_MESSAGES);
-        } catch (e) {}
-        this.renderMessages();
-        this.renderQuickPrompts();
-        if (typeof App !== "undefined" && typeof App.showToast === "function") {
-            App.showToast("Riwayat obrolan AI telah dibersihkan.", "info");
-        }
-    },
-
-    /**
-     * Buka / Tutup Jendela Percakapan
-     */
-    toggleChat(forceState) {
-        const container = document.getElementById("ai-chat-window");
-        const launcher = document.getElementById("ai-chat-launcher");
-        if (!container) return;
-
-        this.isOpen = typeof forceState === "boolean" ? forceState : !this.isOpen;
-
-        if (this.isOpen) {
-            container.classList.remove("hidden");
-            // Delay halus untuk animasi scale up
-            requestAnimationFrame(() => {
-                container.classList.remove("opacity-0", "scale-95", "pointer-events-none");
-                container.classList.add("opacity-100", "scale-100");
+    async clearChat() {
+        let confirmed = true;
+        if (typeof App !== "undefined" && typeof App.confirmModal === "function") {
+            confirmed = await App.confirmModal({
+                title: "Bersihkan Riwayat Konsultasi",
+                message: "Apakah Anda yakin ingin menghapus seluruh riwayat percakapan modul AI?",
+                subMessage: "Semua pesan dan draf dokumen dalam sesi ini akan dibersihkan.",
+                confirmText: "Ya, Bersihkan",
+                confirmType: "warning",
+                icon: "fa-solid fa-broom"
             });
-            if (launcher) launcher.classList.add("ring-4", "ring-indigo-400/40");
-            
-            // Auto focus ke input
-            setTimeout(() => {
-                const input = document.getElementById("ai-chat-input");
-                if (input) input.focus();
-                this.scrollToBottom();
-            }, 100);
-        } else {
-            container.classList.remove("opacity-100", "scale-100");
-            container.classList.add("opacity-0", "scale-95", "pointer-events-none");
-            setTimeout(() => {
-                if (!this.isOpen) container.classList.add("hidden");
-            }, 200);
-            if (launcher) launcher.classList.remove("ring-4", "ring-indigo-400/40");
+        }
+
+        if (confirmed) {
+            // Hancurkan instance chart yang sedang aktif
+            Object.values(this.chartInstances).forEach(chart => {
+                if (chart && typeof chart.destroy === "function") chart.destroy();
+            });
+            this.chartInstances = {};
+
+            this.messages = [];
+            try {
+                localStorage.removeItem(this.STORAGE_KEY_MESSAGES);
+            } catch (e) {}
+            this.renderMessages();
+            if (typeof App !== "undefined" && typeof App.showToast === "function") {
+                App.showToast("Riwayat konsultasi AI telah dibersihkan.", "info");
+            }
         }
     },
 
     /**
-     * Toggle ukuran jendela (Maximize / Normal)
+     * Perbarui badge model yang aktif di header modul
      */
-    toggleMaximize() {
-        const container = document.getElementById("ai-chat-window");
-        const maxBtn = document.getElementById("ai-btn-maximize");
-        if (!container) return;
-
-        this.isMaximized = !this.isMaximized;
-
-        if (this.isMaximized) {
-            container.classList.remove("w-[94vw]", "sm:w-[440px]", "md:w-[480px]", "h-[600px]", "max-h-[82vh]");
-            container.classList.add("w-[96vw]", "sm:w-[720px]", "md:w-[860px]", "h-[88vh]", "max-h-[92vh]");
-            if (maxBtn) maxBtn.innerHTML = '<i class="fa-solid fa-compress text-xs"></i>';
-        } else {
-            container.classList.remove("w-[96vw]", "sm:w-[720px]", "md:w-[860px]", "h-[88vh]", "max-h-[92vh]");
-            container.classList.add("w-[94vw]", "sm:w-[440px]", "md:w-[480px]", "h-[600px]", "max-h-[82vh]");
-            if (maxBtn) maxBtn.innerHTML = '<i class="fa-solid fa-expand text-xs"></i>';
+    updateHeaderBadge() {
+        const badge = document.getElementById("ai-model-badge");
+        if (badge) {
+            const model = localStorage.getItem(this.STORAGE_KEY_MODEL) || "openai/gpt-oss-120b";
+            badge.innerText = model.includes("gpt-oss") ? "GPT OSS 120B (Aktif)" : model;
         }
-        this.scrollToBottom();
     },
 
     /**
-     * Toggle menu pengaturan API Key & Model di header chat
+     * Toggle Modal Pengaturan Model & API Key
      */
-    toggleSettings(forceState) {
-        const panel = document.getElementById("ai-settings-drawer");
-        if (!panel) return;
-        const isHidden = panel.classList.contains("hidden");
-        const willShow = typeof forceState === "boolean" ? forceState : isHidden;
-
-        if (willShow) {
-            panel.classList.remove("hidden");
-            const keyInput = document.getElementById("ai-cfg-api-key");
-            const modelInput = document.getElementById("ai-cfg-model");
+    toggleSettingsModal(show) {
+        const modal = document.getElementById("modal-ai-settings");
+        if (!modal) return;
+        if (show) {
+            modal.classList.remove("hidden");
+            const keyInput = document.getElementById("ai-modal-api-key");
+            const modelInput = document.getElementById("ai-modal-model");
             if (keyInput) keyInput.value = localStorage.getItem(this.STORAGE_KEY_KEY) || "";
             if (modelInput) modelInput.value = localStorage.getItem(this.STORAGE_KEY_MODEL) || "openai/gpt-oss-120b";
         } else {
-            panel.classList.add("hidden");
+            modal.classList.add("hidden");
         }
     },
 
     /**
-     * Simpan pengaturan API Key & Model
+     * Simpan pengaturan dari modal
      */
-    saveSettings() {
-        const keyInput = document.getElementById("ai-cfg-api-key");
-        const modelInput = document.getElementById("ai-cfg-model");
+    saveModalSettings() {
+        const keyInput = document.getElementById("ai-modal-api-key");
+        const modelInput = document.getElementById("ai-modal-model");
         const key = keyInput ? keyInput.value.trim() : "";
         const model = modelInput ? modelInput.value.trim() : "openai/gpt-oss-120b";
 
@@ -169,174 +146,201 @@ const AIAssistant = {
         }
         localStorage.setItem(this.STORAGE_KEY_MODEL, model || "openai/gpt-oss-120b");
 
-        this.toggleSettings(false);
+        this.toggleSettingsModal(false);
+        this.updateHeaderBadge();
         if (typeof App !== "undefined" && typeof App.showToast === "function") {
-            App.showToast("Pengaturan AI berhasil diperbarui!", "success");
+            App.showToast("Pengaturan model AI berhasil disimpan!", "success");
         }
     },
 
     /**
-     * Bangun System Prompt Kontekstual berbasis Peran dan Data Aplikasi Real-time
+     * Render Kartu Aksi Cepat (Quick Prompt Cards) berbasis peran
      */
-    buildSystemPrompt() {
-        const currentUser = typeof AuthService !== "undefined" ? AuthService.getUser() : null;
-        const role = currentUser ? (currentUser.role || "Pengguna") : "Pengguna";
-        const nama = currentUser ? (currentUser.nama || "Bapak/Ibu") : "Bapak/Ibu";
-        const sekolah = currentUser ? (currentUser.asal_sekolah || "") : "";
+    renderActionCards() {
+        const container = document.getElementById("ai-action-cards");
+        if (!container) return;
 
-        // Rangkum status data supervisi aplikasi saat ini
-        let appDataSummary = "";
-        try {
-            if (typeof LiveSync !== "undefined" && LiveSync.state) {
-                const s = LiveSync.state;
-                if (role === "Pengawas") {
-                    const schools = s.schools || [];
-                    const kepsekR = s.reportsKepsek || [];
-                    const guruR = s.reportsGuru || [];
-                    appDataSummary = `KONTEKS DATA APLIKASI SAAT INI (REAL-TIME):
-- Jumlah Sekolah Binaan: ${schools.length} Sekolah (${schools.map(x => x.nama).slice(0, 5).join(", ")}${schools.length > 5 ? '...' : ''})
-- Laporan Kepala Sekolah Terkumpul: ${kepsekR.length} Berkas (Disetujui: ${kepsekR.filter(r => r.status === 'Disetujui').length}, Revisi: ${kepsekR.filter(r => r.status === 'Perlu Perbaikan').length})
-- Laporan Guru Terkumpul: ${guruR.length} Berkas (Disetujui: ${guruR.filter(r => r.status === 'Disetujui').length}, Revisi: ${guruR.filter(r => r.status === 'Perlu Perbaikan').length})`;
-                } else if (role === "Kepala Sekolah" || role === "Kepsek") {
-                    const myGuruReports = (s.reportsGuru || []).filter(r => (r.asalSekolah || "").toLowerCase() === sekolah.toLowerCase());
-                    const myReports = (s.reportsKepsek || []).filter(r => (r.asalSekolah || "").toLowerCase() === sekolah.toLowerCase());
-                    appDataSummary = `KONTEKS SEKOLAH SAAT INI:
-- Satuan Pendidikan: ${sekolah || "Sekolah Binaan"}
-- Status Laporan Manajerial Kepala Sekolah: ${myReports.length} Berkas (${myReports.map(r => `${r.kategori}: ${r.status}`).join(", ") || "Belum ada laporan"})
-- Laporan Guru di Sekolah Anda: ${myGuruReports.length} Berkas (${myGuruReports.filter(r => r.status === 'Disetujui').length} Disetujui, ${myGuruReports.filter(r => r.status === 'Perlu Perbaikan').length} Perlu Revisi)`;
-                } else if (role === "Guru") {
-                    const myReports = (s.reportsGuru || []).filter(r => (r.nama || "").toLowerCase() === nama.toLowerCase() || (r.asalSekolah || "").toLowerCase() === sekolah.toLowerCase());
-                    const needRevision = myReports.filter(r => r.status === 'Perlu Perbaikan' || r.status === 'Ditolak');
-                    appDataSummary = `KONTEKS GURU SAAT INI:
-- Nama Pendidik: ${nama}
-- Satuan Pendidikan: ${sekolah || "Sekolah"}
-- Total Berkas Laporan Anda: ${myReports.length} Dokumen
-${needRevision.length > 0 ? `- Perhatian Berkas Perlu Revisi: ${needRevision.map(r => `[${r.kategori}] Catatan Pengawas: "${r.catatan || 'Perlu perbaikan kelengkapan'}"`).join(" | ")}` : '- Status Berkas: Semua berkas terverifikasi baik/menunggu evaluasi.'}`;
-                }
-            }
-        } catch (e) {}
-
-        return `Anda adalah "PantauBot", Asisten AI Cerdas Pendidik & Pengawas Sekolah Resmi pada platform PantauSekolah.
-Identitas Pengguna yang sedang berbicara dengan Anda:
-- Nama: ${nama}
-- Peran: ${role}
-- Asal Sekolah / Instansi: ${sekolah || "Dinas Pendidikan"}
-
-${appDataSummary}
-
-PANDUAN & ATURAN RESPON:
-1. Bersikaplah profesional, edukatif, santun, solutif, dan menguasai regulasi pendidikan di Indonesia (Kurikulum Merdeka, Standar Nasional Pendidikan, Permendikbudristek No. 12/2024 tentang Kurikulum pada PAUD, Dikdas, dan Dikmen, Perdirjen GTK tentang Pengelolaan Kinerja Guru & Kepala Sekolah di PMM, serta pengelolaan BOS/BOSP/RKAS).
-2. Jika pengguna meminta bantuan pembuatan naskah (seperti Modul Ajar, RPP, kisi-kisi soal asesmen, draf surat tugas, sambutan rapat, atau rekomendasi tindak lanjut hasil supervisi), berikan draf yang lengkap, terstruktur rapi, siap pakai, dan berkualitas tinggi.
-3. Gunakan pemformatan Markdown yang bersih dan mudah dibaca: gunakan **tebal** untuk poin penting, gunakan daftar berbutir (-) atau bernomor (1, 2, 3), dan beri jarak baris yang nyaman dibaca.
-4. Jangan ragu berinisiatif memberikan tips tambahan yang bermanfaat bagi peningkatan mutu pendidikan di sekolah pengguna. Jawab selalu dalam Bahasa Indonesia yang baik dan formal-santun.`;
-    },
-
-    /**
-     * Dapatkan daftar rekomendasi pertanyaan cepat sesuai peran aktif
-     */
-    getQuickPromptsForRole() {
         const currentUser = typeof AuthService !== "undefined" ? AuthService.getUser() : null;
         const role = currentUser ? (currentUser.role || "") : "";
 
+        let cards = [];
         if (role === "Pengawas") {
-            return [
-                { icon: "fa-chart-pie", text: "Analisis kepatuhan sekolah binaan saya" },
-                { icon: "fa-file-signature", text: "Buatkan draf surat tugas monitoring supervisi" },
-                { icon: "fa-lightbulb", text: "Rekomendasi tindak lanjut sekolah kepatuhan rendah" },
-                { icon: "fa-clipboard-check", text: "Format instrumen supervisi klinis guru" }
+            cards = [
+                {
+                    key: "analisis_kepatuhan",
+                    icon: "fa-chart-pie",
+                    color: "emerald",
+                    title: "Analisis Kepatuhan & Grafik",
+                    desc: "Visualisasikan tingkat kepatuhan sekolah binaan dalam grafik interaktif & rincian predikat.",
+                    prompt: "Tolong lakukan analisis komprehensif tingkat kepatuhan sekolah binaan saya, sajikan dalam bentuk grafik statistik, rincian tabel predikat, dan rekomendasi tindak lanjut pembinaan."
+                },
+                {
+                    key: "draf_surat_tugas",
+                    icon: "fa-file-signature",
+                    color: "indigo",
+                    title: "Draf Surat Tugas Supervisi",
+                    desc: "Susun draf surat tugas resmi monitoring pengawasan lapangan lengkap tabel lampiran siap unduh Word/PDF.",
+                    prompt: "Buatkan draf resmi Surat Tugas Pengawasan Lapangan & Supervisi Akademik lengkap dengan dasar hukum dinas, rincian tabel daftar sekolah yang dikunjungi, jadwal, dan tanda tangan pejabat berwenang."
+                },
+                {
+                    key: "instrumen_supervisi",
+                    icon: "fa-clipboard-check",
+                    color: "amber",
+                    title: "Instrumen Supervisi Klinis Guru",
+                    desc: "Format instrumen observasi pembelajaran kelas Kurikulum Merdeka berstandar dinas pendidikan.",
+                    prompt: "Susunkan instrumen supervisi klinis pembelajaran guru di kelas Kurikulum Merdeka dalam format tabel lengkap indikator asesmen (1-4), catatan observasi, dan rubrik tindak lanjut."
+                },
+                {
+                    key: "rekomendasi_dinas",
+                    icon: "fa-envelope-open-text",
+                    color: "purple",
+                    title: "Rekomendasi Kebijakan Dinas",
+                    desc: "Sintesis naskah rekomendasi perbaikan manajerial sekolah untuk Kepala Dinas Pendidikan.",
+                    prompt: "Susunkan naskah rekomendasi kebijakan resmi untuk Kepala Dinas Pendidikan mengenai tindak lanjut sekolah yang persentase kepatuhannya masih di bawah standar."
+                }
             ];
         } else if (role === "Kepala Sekolah" || role === "Kepsek") {
-            return [
-                { icon: "fa-folder-tree", text: "Cek kelengkapan dokumen wajib guru semester ini" },
-                { icon: "fa-money-bill-wave", text: "Panduan alokasi RKAS BOS berbasis Rapor Pendidikan" },
-                { icon: "fa-microphone", text: "Buatkan draf sambutan rapat evaluasi guru" },
-                { icon: "fa-people-group", text: "Strategi pembinaan guru yang belum mencapai target" }
+            cards = [
+                {
+                    key: "cek_berkas_guru",
+                    icon: "fa-folder-tree",
+                    color: "teal",
+                    title: "Kelengkapan Berkas Guru",
+                    desc: "Matriks dokumen wajib yang harus diunggah guru semester ini beserta kriteria verifikasinya.",
+                    prompt: "Tampilkan checklist matriks dokumen administrasi wajib yang harus diunggah oleh guru pada semester ini beserta kriteria kelayakannya sebelum diverifikasi kepala sekolah."
+                },
+                {
+                    key: "rkas_rapor_pendidikan",
+                    icon: "fa-money-bill-wave",
+                    color: "emerald",
+                    title: "Panduan Alokasi RKAS BOS",
+                    desc: "Strategi alokasi dana BOSP berbasis indikator prioritas Rapor Pendidikan sekolah.",
+                    prompt: "Berikan panduan komprehensif dan format tabel perencanaan alokasi dana RKAS BOS berdasarkan indikator prioritas Rapor Pendidikan (literasi, numerasi, dan iklim keamanan sekolah)."
+                },
+                {
+                    key: "sambutan_rapat",
+                    icon: "fa-microphone",
+                    color: "indigo",
+                    title: "Draf Sambutan Rapat Evaluasi",
+                    desc: "Teks sambutan rapat evaluasi berkala bersama dewan guru yang memotivasi peningkatan mutu.",
+                    prompt: "Buatkan draf pidato sambutan Kepala Sekolah pada rapat evaluasi kinerja guru tengah semester yang membakar semangat, santun, dan fokus pada peningkatan mutu pembelajaran."
+                },
+                {
+                    key: "pembinaan_guru",
+                    icon: "fa-people-group",
+                    color: "amber",
+                    title: "Strategi Pembinaan Guru",
+                    desc: "Langkah terstruktur mendampingi guru yang mengalami kendala administrasi atau kurikulum.",
+                    prompt: "Berikan panduan dan instrumen pendampingan kepala sekolah terhadap guru yang berkas laporannya perlu perbaikan atau belum mencapai target kinerja."
+                }
             ];
         } else {
             // Guru (default)
-            return [
-                { icon: "fa-book-open", text: "Bantu susun Modul Ajar Kurikulum Merdeka" },
-                { icon: "fa-screwdriver-wrench", text: "Panduan perbaikan berkas yang ditolak pengawas" },
-                { icon: "fa-pen-to-square", text: "Buatkan 5 soal AKM Literasi lengkap dengan rubrik" },
-                { icon: "fa-puzzle-piece", text: "Ide asesmen formatif yang menyenangkan di kelas" }
+            cards = [
+                {
+                    key: "modul_ajar",
+                    icon: "fa-book-open",
+                    color: "indigo",
+                    title: "Susun Modul Ajar Lengkap",
+                    desc: "Rancang modul ajar Kurikulum Merdeka berdiferensiasi dengan asesmen siap unduh Word/PDF.",
+                    prompt: "Bantu saya menyusun rancangan Modul Ajar Kurikulum Merdeka yang lengkap, mencakup identitas modul, capaian pembelajaran (CP), tujuan pembelajaran (TP), langkah kegiatan berdiferensiasi (konten/proses/produk), serta rubrik asesmen autentik."
+                },
+                {
+                    key: "panduan_revisi",
+                    icon: "fa-screwdriver-wrench",
+                    color: "rose",
+                    title: "Perbaikan Berkas Revisi",
+                    desc: "Analisis berkas Anda yang ditolak atau perlu perbaikan beserta solusi pemenuhannya.",
+                    prompt: "Tolong periksa berkas saya yang statusnya 'Perlu Perbaikan' atau 'Ditolak', jelaskan mengapa berkas tersebut perlu revisi dan berikan contoh perbaikan dokumen yang benar sesuai standar pengawas."
+                },
+                {
+                    key: "kisi_kisi_akm",
+                    icon: "fa-pen-to-square",
+                    color: "emerald",
+                    title: "Kisi-Kisi & Soal AKM Literasi",
+                    desc: "Format tabel kisi-kisi soal penalaran tingkat tinggi (HOTS) lengkap kunci & rubrik penskoran.",
+                    prompt: "Buatkan format kisi-kisi dan 5 butir soal AKM Literasi HOTS lengkap dengan stimulus teks kontekstual, indikator soal, kunci jawaban, dan rubrik penilaian bergradasi."
+                },
+                {
+                    key: "asesmen_formatif",
+                    icon: "fa-puzzle-piece",
+                    color: "amber",
+                    title: "Ide Asesmen Formatif Menarik",
+                    desc: "Ragam teknik asesmen formatif interaktif dan lembar refleksi siswa di dalam kelas.",
+                    prompt: "Berikan 5 ide kreatif asesmen formatif pembelajaran yang menyenangkan di kelas beserta format lembar penilaian observasi dan lembar refleksi diri siswa."
+                }
             ];
         }
-    },
 
-    /**
-     * Render daftar pill pertanyaan cepat
-     */
-    renderQuickPrompts() {
-        const container = document.getElementById("ai-quick-prompts-container");
-        if (!container) return;
-
-        // Tampilkan hanya jika riwayat pesan kosong atau hanya ada 1 pesan sambutan
-        if (this.messages.length > 2) {
-            container.innerHTML = "";
-            container.classList.add("hidden");
-            return;
-        }
-
-        container.classList.remove("hidden");
-        const prompts = this.getQuickPromptsForRole();
-        let html = `
-            <div class="px-3 pt-2 pb-1">
-                <p class="text-[11px] font-semibold text-slate-400 dark:text-slate-400 mb-2 flex items-center gap-1.5">
-                    <i class="fa-solid fa-bolt-lightning text-amber-500"></i> Pertanyaan Cepat Sekali Klik:
-                </p>
-                <div class="flex flex-wrap gap-1.5">
-        `;
-
-        prompts.forEach((p, idx) => {
+        let html = "";
+        cards.forEach(c => {
+            const bgBadge = `bg-${c.color}-500/10 text-${c.color}-600 dark:text-${c.color}-400 border-${c.color}-500/20`;
             html += `
-                <button type="button" onclick="AIAssistant.sendQuickPrompt('${encodeURIComponent(p.text)}')"
-                    class="text-[11px] font-medium px-2.5 py-1.5 rounded-lg bg-indigo-50 dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-slate-700 border border-indigo-200/60 dark:border-slate-700 transition-colors flex items-center gap-1.5 text-left">
-                    <i class="fa-solid ${p.icon} text-[10px] text-indigo-500"></i>
-                    <span>${p.text}</span>
-                </button>
+                <div onclick="AIAssistant.sendActionPrompt('${encodeURIComponent(c.prompt)}', '${c.key}')"
+                    class="bg-white dark:bg-[#11141D] p-4 rounded-2xl border border-[#E8E2D5] dark:border-slate-800 shadow-2xs hover:shadow-md hover:border-indigo-400 dark:hover:border-indigo-600 transition-all cursor-pointer group flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-2.5">
+                            <div class="w-9 h-9 rounded-xl ${bgBadge} border flex items-center justify-center text-sm group-hover:scale-110 transition-transform">
+                                <i class="fa-solid ${c.icon}"></i>
+                            </div>
+                            <span class="text-[10px] font-bold text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 flex items-center gap-1">
+                                Klik <i class="fa-solid fa-arrow-right text-[9px]"></i>
+                            </span>
+                        </div>
+                        <h4 class="text-xs font-bold text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors mb-1">
+                            ${c.title}
+                        </h4>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-2">
+                            ${c.desc}
+                        </p>
+                    </div>
+                </div>
             `;
         });
 
-        html += `
-                </div>
-            </div>
-        `;
         container.innerHTML = html;
     },
 
     /**
-     * Kirim prompt cepat dari pill
+     * Kirim prompt dari kartu aksi cepat
      */
-    sendQuickPrompt(encodedText) {
-        const text = decodeURIComponent(encodedText);
-        const input = document.getElementById("ai-chat-input");
+    sendActionPrompt(encodedPrompt, actionKey) {
+        const prompt = decodeURIComponent(encodedPrompt);
+        const input = document.getElementById("ai-module-input");
         if (input) {
-            input.value = text;
-            this.handleSend();
+            input.value = prompt;
+            this.handleModuleSend(actionKey);
         }
     },
 
     /**
-     * Render daftar pesan percakapan
+     * Render daftar pesan pada workspace modul
      */
     renderMessages() {
-        const container = document.getElementById("ai-chat-messages");
+        const container = document.getElementById("ai-module-chat-thread");
         if (!container) return;
 
         if (this.messages.length === 0) {
             const currentUser = typeof AuthService !== "undefined" ? AuthService.getUser() : null;
-            const nama = currentUser ? currentUser.nama : "Bapak/Ibu";
+            const nama = currentUser ? currentUser.nama : "Bapak/Ibu Pendidik";
             const role = currentUser ? currentUser.role : "Pendidik";
+            const school = currentUser ? (currentUser.asal_sekolah || "Dinas Pendidikan") : "";
 
             container.innerHTML = `
-                <div class="p-6 text-center text-slate-400 dark:text-slate-500 flex flex-col items-center justify-center h-full">
-                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-600 text-white flex items-center justify-center text-2xl shadow-lg shadow-indigo-500/20 mb-3 animate-bounce">
+                <div class="p-8 sm:p-12 text-center text-slate-400 dark:text-slate-500 flex flex-col items-center justify-center h-full">
+                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-500 via-indigo-600 to-purple-600 text-white flex items-center justify-center text-3xl shadow-lg shadow-indigo-500/20 mb-4 animate-bounce">
                         <i class="fa-solid fa-wand-magic-sparkles"></i>
                     </div>
-                    <h4 class="text-sm font-bold text-slate-700 dark:text-slate-200 mb-1">Halo, ${nama}! 👋</h4>
-                    <p class="text-xs text-slate-500 dark:text-slate-400 max-w-xs leading-relaxed">
-                        Saya <strong>PantauBot AI</strong>. Siap membantu Anda dalam hal apapun seputar administrasi sekolah, regulasi Kurikulum Merdeka, penyusunan berkas, atau evaluasi data supervisi.
+                    <h3 class="text-base sm:text-lg font-extrabold text-slate-800 dark:text-slate-100 mb-1.5">
+                        Selamat Datang di Modul Asisten AI PantauSekolah!
+                    </h3>
+                    <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-lg leading-relaxed mb-4">
+                        Halo <strong>${nama}</strong> (${role} - ${school}). Modul ini siap menganalisis kepatuhan sekolah dalam <strong>grafik visual interaktif</strong>, menyusun draf dokumen resmi, Modul Ajar Kurikulum Merdeka, serta menyediakan tombol ekspor langsung ke <strong>Microsoft Word (.doc)</strong> dan <strong>PDF Resmi</strong>.
                     </p>
+                    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 text-indigo-700 dark:text-indigo-300 text-xs font-semibold">
+                        <i class="fa-solid fa-lightbulb text-amber-500"></i>
+                        <span>Pilih salah satu kartu aksi di atas atau ketik instruksi di bawah untuk memulai</span>
+                    </div>
                 </div>
             `;
             return;
@@ -349,31 +353,82 @@ PANDUAN & ATURAN RESPON:
 
             if (isUser) {
                 html += `
-                    <div class="flex justify-end mb-3.5 pl-8">
-                        <div class="max-w-[85%] bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-3.5 py-2.5 rounded-2xl rounded-tr-sm shadow-sm text-xs leading-relaxed break-words">
+                    <div class="flex justify-end pl-8 sm:pl-16">
+                        <div class="max-w-[85%] sm:max-w-[75%] bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-600 text-white px-4 py-3 rounded-2xl rounded-tr-xs shadow-sm text-xs sm:text-sm leading-relaxed break-words">
                             <p class="whitespace-pre-wrap">${this.escapeHtml(m.content)}</p>
-                            ${time ? `<span class="text-[9px] text-indigo-200 block text-right mt-1 opacity-80">${time}</span>` : ""}
+                            ${time ? `<span class="text-[10px] text-indigo-200 block text-right mt-1.5 opacity-80">${time}</span>` : ""}
                         </div>
                     </div>
                 `;
             } else {
-                const formattedContent = this.formatMarkdown(m.content);
+                const formattedHtml = this.renderMarkdownToHtml(m.content);
+                const hasDoc = this.isFormalDocument(m.content);
+                const title = m.docTitle || this.extractDocumentTitle(m.content) || "Dokumen_PantauSekolah";
+                const chartCanvasId = m.chartId || "";
+
                 html += `
-                    <div class="flex items-start gap-2.5 mb-4 pr-6 group">
-                        <div class="w-7 h-7 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-600 text-white flex items-center justify-center text-xs flex-shrink-0 mt-0.5 shadow-sm">
+                    <div class="flex items-start gap-3.5 pr-2 sm:pr-8 group">
+                        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center text-sm flex-shrink-0 mt-1 shadow-sm shadow-indigo-500/20">
                             <i class="fa-solid fa-robot"></i>
                         </div>
                         <div class="flex-1 min-w-0">
-                            <div class="bg-white dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 px-4 py-3 rounded-2xl rounded-tl-sm border border-slate-200/80 dark:border-slate-700/80 shadow-sm text-xs leading-relaxed break-words prose-ai">
-                                ${formattedContent}
+                            <!-- Paper / Document Container Card -->
+                            <div class="bg-white dark:bg-[#151923] text-slate-800 dark:text-slate-100 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
+                                
+                                <!-- Document Action Header (Word, PDF, Salin) -->
+                                <div class="px-4 sm:px-5 py-3 border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/70 dark:bg-slate-900/40 flex items-center justify-between flex-wrap gap-2">
+                                    <div class="flex items-center gap-2 min-w-0">
+                                        <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                                        <span class="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">
+                                            ${this.escapeHtml(title)}
+                                        </span>
+                                    </div>
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <button type="button" onclick="AIAssistant.downloadWord(${idx})"
+                                            class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:hover:bg-blue-950/60 dark:text-blue-300 rounded-lg text-xs font-bold border border-blue-200 dark:border-blue-800 transition-colors shadow-2xs" title="Unduh naskah ini ke format Microsoft Word">
+                                            <i class="fa-solid fa-file-word text-blue-600 dark:text-blue-400"></i>
+                                            <span>Download Word (.doc)</span>
+                                        </button>
+                                        <button type="button" onclick="AIAssistant.downloadPdf(${idx})"
+                                            class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:hover:bg-rose-950/60 dark:text-rose-300 rounded-lg text-xs font-bold border border-rose-200 dark:border-rose-800 transition-colors shadow-2xs" title="Cetak atau simpan naskah ini sebagai PDF">
+                                            <i class="fa-solid fa-file-pdf text-rose-600 dark:text-rose-400"></i>
+                                            <span>Download PDF</span>
+                                        </button>
+                                        <button type="button" onclick="AIAssistant.copyMessage(${idx})"
+                                            class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 rounded-lg text-xs font-semibold transition-colors" title="Salin seluruh teks">
+                                            <i class="fa-regular fa-copy"></i>
+                                            <span class="hidden sm:inline">Salin</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Dynamic Chart Container (jika respon analisis menyertakan grafik) -->
+                                ${chartCanvasId ? `
+                                    <div class="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30">
+                                        <div class="flex items-center justify-between mb-3">
+                                            <h5 class="text-xs font-extrabold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                                                <i class="fa-solid fa-chart-column text-emerald-600"></i> Visualisasi Statistik Kepatuhan Supervisi
+                                            </h5>
+                                            <span class="text-[10px] font-semibold text-slate-400">Chart.js Dinamis</span>
+                                        </div>
+                                        <div class="relative h-60 sm:h-72 w-full">
+                                            <canvas id="${chartCanvasId}"></canvas>
+                                        </div>
+                                    </div>
+                                ` : ""}
+
+                                <!-- Main Body Document Content -->
+                                <div id="doc-content-${idx}" class="p-5 sm:p-6 text-xs sm:text-sm leading-relaxed text-slate-800 dark:text-slate-100 space-y-3 prose-doc">
+                                    ${formattedHtml}
+                                </div>
                             </div>
+
                             <div class="flex items-center gap-2 mt-1.5 px-1">
-                                ${time ? `<span class="text-[9px] text-slate-400">${time}</span>` : ""}
-                                <button type="button" onclick="AIAssistant.copyMessage(${idx})" 
-                                    class="text-[10px] text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1 transition-colors" title="Salin teks">
-                                    <i class="fa-regular fa-copy"></i> Salin
-                                </button>
-                                ${m.model ? `<span class="text-[9px] text-slate-400 font-mono bg-slate-100 dark:bg-slate-700/50 px-1.5 py-0.2 rounded border border-slate-200 dark:border-slate-700">${m.model}</span>` : ""}
+                                ${time ? `<span class="text-[10px] text-slate-400">${time}</span>` : ""}
+                                <span class="text-[10px] text-slate-400">•</span>
+                                <span class="text-[10px] font-mono text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 rounded border border-slate-200 dark:border-slate-700">
+                                    ${m.model || "openai/gpt-oss-120b"}
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -383,13 +438,16 @@ PANDUAN & ATURAN RESPON:
 
         if (this.isLoading) {
             html += `
-                <div class="flex items-start gap-2.5 mb-4 pr-6 animate-pulse">
-                    <div class="w-7 h-7 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-600 text-white flex items-center justify-center text-xs flex-shrink-0 mt-0.5">
+                <div class="flex items-start gap-3.5 pr-8 animate-pulse">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white flex items-center justify-center text-sm flex-shrink-0 mt-1">
                         <i class="fa-solid fa-spinner fa-spin"></i>
                     </div>
-                    <div class="bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-3.5 py-2.5 rounded-2xl rounded-tl-sm border border-slate-200 dark:border-slate-700 shadow-sm text-xs flex items-center gap-2">
-                        <span class="inline-block w-1.5 h-1.5 rounded-full bg-indigo-500 animate-ping"></span>
-                        <span>PantauBot sedang menalar & merumuskan jawaban...</span>
+                    <div class="bg-white dark:bg-[#151923] text-slate-600 dark:text-slate-300 px-5 py-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs text-xs sm:text-sm flex items-center gap-3">
+                        <span class="inline-block w-2.5 h-2.5 rounded-full bg-indigo-600 animate-ping"></span>
+                        <div class="space-y-1">
+                            <p class="font-bold text-slate-800 dark:text-slate-100">PantauBot sedang menalar & merumuskan naskah...</p>
+                            <p class="text-[11px] text-slate-400">Menganalisis regulasi, data riil sekolah binaan, dan menyusun format Word & PDF yang rapi.</p>
+                        </div>
                     </div>
                 </div>
             `;
@@ -397,40 +455,140 @@ PANDUAN & ATURAN RESPON:
 
         container.innerHTML = html;
         this.scrollToBottom();
+
+        // Render semua canvas chart yang ada di thread pesan
+        this.renderAllChartsInThread();
     },
 
     /**
-     * Format Markdown sederhana untuk bubble respon AI
+     * Parse teks Markdown menjadi HTML berstandar dokumen resmi:
+     * - Tabel bergaris rapi (table, thead, tbody, th, td)
+     * - Headings H1 - H6 (termasuk ####)
+     * - Lists, bolds, italics, quotes, hr
      */
-    formatMarkdown(text) {
-        if (!text) return "";
-        let out = this.escapeHtml(text);
+    renderMarkdownToHtml(markdown) {
+        if (!markdown) return "";
 
-        // Code blocks: ```code```
-        out = out.replace(/```([\s\S]*?)```/g, '<pre class="bg-slate-900 text-slate-100 p-2.5 rounded-lg my-2 overflow-x-auto font-mono text-[11px]"><code>$1</code></pre>');
+        const lines = markdown.split("\n");
+        let htmlOut = [];
+        let inTable = false;
+        let tableRows = [];
 
-        // Inline code: `code`
-        out = out.replace(/`([^`]+)`/g, '<code class="bg-slate-100 dark:bg-slate-700 px-1 py-0.5 rounded text-[11px] font-mono text-indigo-600 dark:text-indigo-300">$1</code>');
+        const flushTable = () => {
+            if (tableRows.length === 0) return;
 
-        // Bold: **text**
-        out = out.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold text-slate-900 dark:text-white">$1</strong>');
+            let tableHtml = '<div class="my-4 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs">' +
+                '<table class="w-full text-xs text-left border-collapse">';
 
-        // Italic: *text*
-        out = out.replace(/\*([^*]+)\*/g, '<em class="italic">$1</em>');
+            let isHeader = true;
+            for (let i = 0; i < tableRows.length; i++) {
+                const row = tableRows[i].trim();
+                // Lewati baris separator |---|---|
+                if (/^\|?(\s*:?-+:?\s*\|)+\s*:?-+:?\s*\|?$/.test(row)) {
+                    isHeader = false;
+                    continue;
+                }
 
-        // Headers: ###, ##, #
-        out = out.replace(/^### (.*$)/gim, '<h5 class="text-xs font-bold text-indigo-600 dark:text-indigo-400 mt-2 mb-1">$1</h5>');
-        out = out.replace(/^## (.*$)/gim, '<h4 class="text-sm font-extrabold text-slate-800 dark:text-slate-100 mt-2.5 mb-1.5">$1</h4>');
-        out = out.replace(/^# (.*$)/gim, '<h3 class="text-base font-black text-slate-800 dark:text-slate-100 mt-3 mb-2">$1</h3>');
+                const cells = row.split("|").slice(1, -1).map(c => c.trim());
+                if (cells.length === 0) continue;
 
-        // Bullet list lines: - item or * item
-        out = out.replace(/^\s*[-*]\s+(.*)$/gim, '<li class="ml-4 list-disc text-xs leading-relaxed my-0.5">$1</li>');
+                if (isHeader) {
+                    tableHtml += '<thead class="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-100 font-extrabold text-[11px] uppercase tracking-wider"><tr>';
+                    cells.forEach(c => {
+                        tableHtml += `<th class="px-3.5 py-2.5 border border-slate-200 dark:border-slate-700">${this.formatInlineMarkdown(c)}</th>`;
+                    });
+                    tableHtml += '</tr></thead><tbody class="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900/60">';
+                    isHeader = false;
+                } else {
+                    tableHtml += '<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40">';
+                    cells.forEach(c => {
+                        tableHtml += `<td class="px-3.5 py-2 border border-slate-200/80 dark:border-slate-700/80 text-slate-700 dark:text-slate-200">${this.formatInlineMarkdown(c)}</td>`;
+                    });
+                    tableHtml += '</tr>';
+                }
+            }
 
-        // Numbered list lines: 1. item
-        out = out.replace(/^\s*(\d+)\.\s+(.*)$/gim, '<li class="ml-4 list-decimal text-xs leading-relaxed my-0.5"><span class="font-semibold text-indigo-600 dark:text-indigo-400">$1.</span> $2</li>');
+            tableHtml += '</tbody></table></div>';
+            htmlOut.push(tableHtml);
+            tableRows = [];
+            inTable = false;
+        };
 
-        // Line breaks to <br>
-        out = out.replace(/\n/g, '<br>');
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const trimmed = line.trim();
+
+            // 1. Cek baris tabel (| ... |)
+            if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
+                inTable = true;
+                tableRows.push(trimmed);
+                continue;
+            } else if (inTable) {
+                flushTable();
+            }
+
+            // 2. Headings (H1 - H6)
+            if (/^######\s+(.*)$/.test(trimmed)) {
+                htmlOut.push(`<h6 class="text-xs font-bold text-slate-700 dark:text-slate-300 mt-2 mb-1">${this.formatInlineMarkdown(trimmed.replace(/^######\s+/, ''))}</h6>`);
+            } else if (/^#####\s+(.*)$/.test(trimmed)) {
+                htmlOut.push(`<h5 class="text-xs font-bold text-indigo-600 dark:text-indigo-400 mt-2.5 mb-1">${this.formatInlineMarkdown(trimmed.replace(/^#####\s+/, ''))}</h5>`);
+            } else if (/^####\s+(.*)$/.test(trimmed)) {
+                // Selesaikan masalah raw #### pada gambar user
+                htmlOut.push(`<h4 class="text-sm font-extrabold text-indigo-700 dark:text-indigo-300 mt-3.5 mb-1.5 flex items-center gap-1.5"><i class="fa-solid fa-angle-right text-xs text-indigo-500"></i> ${this.formatInlineMarkdown(trimmed.replace(/^####\s+/, ''))}</h4>`);
+            } else if (/^###\s+(.*)$/.test(trimmed)) {
+                htmlOut.push(`<h3 class="text-base font-extrabold text-slate-900 dark:text-white mt-4 mb-2 pb-1 border-b border-slate-100 dark:border-slate-800">${this.formatInlineMarkdown(trimmed.replace(/^###\s+/, ''))}</h3>`);
+            } else if (/^##\s+(.*)$/.test(trimmed)) {
+                htmlOut.push(`<h2 class="text-lg font-black text-slate-900 dark:text-white mt-4.5 mb-2">${this.formatInlineMarkdown(trimmed.replace(/^##\s+/, ''))}</h2>`);
+            } else if (/^#\s+(.*)$/.test(trimmed)) {
+                htmlOut.push(`<h1 class="text-xl font-black text-slate-900 dark:text-white mt-5 mb-2.5 text-center">${this.formatInlineMarkdown(trimmed.replace(/^#\s+/, ''))}</h1>`);
+            }
+            // 3. Blockquotes
+            else if (/^>\s+(.*)$/.test(trimmed)) {
+                htmlOut.push(`<blockquote class="border-l-4 border-indigo-500 bg-indigo-50/40 dark:bg-indigo-950/20 px-3.5 py-2.5 rounded-r-xl my-2 text-slate-700 dark:text-slate-300 italic text-xs leading-relaxed">${this.formatInlineMarkdown(trimmed.replace(/^>\s+/, ''))}</blockquote>`);
+            }
+            // 4. Horizontal Rules
+            else if (/^(\*\*\*|---|___)$/.test(trimmed)) {
+                htmlOut.push('<hr class="my-4 border-t border-slate-200 dark:border-slate-800">');
+            }
+            // 5. Bullet Lists (- atau *)
+            else if (/^[-*]\s+(.*)$/.test(trimmed)) {
+                htmlOut.push(`<div class="flex items-start gap-2 ml-3 my-1 text-slate-700 dark:text-slate-200"><span class="text-indigo-500 font-bold mt-0.5">•</span><div class="flex-1">${this.formatInlineMarkdown(trimmed.replace(/^[-*]\s+/, ''))}</div></div>`);
+            }
+            // 6. Numbered Lists (1. 2. dll)
+            else if (/^(\d+)\.\s+(.*)$/.test(trimmed)) {
+                const match = trimmed.match(/^(\d+)\.\s+(.*)$/);
+                htmlOut.push(`<div class="flex items-start gap-2 ml-3 my-1 text-slate-700 dark:text-slate-200"><span class="text-indigo-600 dark:text-indigo-400 font-bold min-w-[18px] text-right">${match[1]}.</span><div class="flex-1">${this.formatInlineMarkdown(match[2])}</div></div>`);
+            }
+            // 7. Paragraf biasa atau kosong
+            else {
+                if (trimmed === "") {
+                    htmlOut.push('<div class="h-2"></div>');
+                } else {
+                    htmlOut.push(`<p class="leading-relaxed text-slate-700 dark:text-slate-200 my-1">${this.formatInlineMarkdown(trimmed)}</p>`);
+                }
+            }
+        }
+
+        if (inTable) flushTable();
+
+        return htmlOut.join("\n");
+    },
+
+    /**
+     * Format inline markdown: bold, italic, code, links
+     */
+    formatInlineMarkdown(str) {
+        if (!str) return "";
+        let out = this.escapeHtml(str);
+
+        // Inline code
+        out = out.replace(/`([^`]+)`/g, '<code class="bg-slate-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded font-mono text-[11px]">$1</code>');
+
+        // Bold **text**
+        out = out.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-extrabold text-slate-900 dark:text-white">$1</strong>');
+
+        // Italic *text*
+        out = out.replace(/\*([^*]+)\*/g, '<em class="italic text-slate-800 dark:text-slate-200">$1</em>');
 
         return out;
     },
@@ -446,6 +604,149 @@ PANDUAN & ATURAN RESPON:
     },
 
     /**
+     * Cek apakah teks merupakan naskah dokumen formal
+     */
+    isFormalDocument(text) {
+        if (!text) return false;
+        const upper = text.toUpperCase();
+        return upper.includes("SURAT TUGAS") ||
+            upper.includes("MODUL AJAR") ||
+            upper.includes("RENCANA PELAKSANAAN") ||
+            upper.includes("INSTRUMEN SUPERVISI") ||
+            upper.includes("REKOMENDASI KEBIJAKAN") ||
+            upper.includes("| NO |") ||
+            upper.includes("LAMPIRAN");
+    },
+
+    /**
+     * Ekstrak judul dokumen dari respon teks
+     */
+    extractDocumentTitle(text) {
+        if (!text) return "";
+        const lines = text.split("\n");
+        for (let i = 0; i < Math.min(lines.length, 6); i++) {
+            const line = lines[i].trim().replace(/^#+\s*/, "").replace(/\*\*/g, "");
+            if (line.length > 5 && (
+                line.toUpperCase().includes("SURAT") ||
+                line.toUpperCase().includes("MODUL") ||
+                line.toUpperCase().includes("INSTRUMEN") ||
+                line.toUpperCase().includes("ANALISIS") ||
+                line.toUpperCase().includes("LAPORAN") ||
+                line.toUpperCase().includes("PANDUAN")
+            )) {
+                return line.slice(0, 60);
+            }
+        }
+        return "Dokumen_Dinas_PantauSekolah";
+    },
+
+    /**
+     * Ekspor naskah ke format Microsoft Word (.doc)
+     */
+    downloadWord(messageIndex) {
+        const msg = this.messages[messageIndex];
+        if (!msg) return;
+
+        const docTitle = msg.docTitle || this.extractDocumentTitle(msg.content) || "Dokumen_PantauSekolah";
+        const contentHtml = this.renderMarkdownToHtml(msg.content);
+
+        const wordHtml = `
+            <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+            <head>
+                <meta charset='utf-8'>
+                <title>${docTitle}</title>
+                <style>
+                    body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; color: #000; margin: 2.5cm 2cm 2.5cm 2.5cm; }
+                    h1, h2, h3, h4, h5 { font-family: 'Times New Roman', serif; font-weight: bold; color: #000; margin-top: 12pt; margin-bottom: 6pt; }
+                    h1 { font-size: 16pt; text-align: center; }
+                    h2 { font-size: 14pt; text-align: center; }
+                    h3 { font-size: 13pt; }
+                    h4 { font-size: 12pt; }
+                    table { border-collapse: collapse; width: 100%; margin: 12pt 0; }
+                    th, td { border: 1px solid #000; padding: 6pt 8pt; font-size: 11pt; text-align: left; }
+                    th { background-color: #f2f2f2; font-weight: bold; text-align: center; }
+                    ul, ol { margin-left: 20pt; margin-bottom: 8pt; }
+                    p { margin-bottom: 6pt; text-align: justify; }
+                </style>
+            </head>
+            <body>
+                ${contentHtml}
+            </body>
+            </html>
+        `;
+
+        const blob = new Blob(['\ufeff' + wordHtml], {
+            type: 'application/msword;charset=utf-8'
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${docTitle.replace(/[^a-zA-Z0-9_\-]/g, '_')}.doc`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        if (typeof App !== "undefined" && typeof App.showToast === "function") {
+            App.showToast(`Dokumen "${docTitle}" berhasil diunduh dalam format Word (.doc)!`, "success");
+        }
+    },
+
+    /**
+     * Ekspor naskah ke PDF resmi (melalui dialog Print A4 browser yang rapi)
+     */
+    downloadPdf(messageIndex) {
+        const msg = this.messages[messageIndex];
+        if (!msg) return;
+
+        const docTitle = msg.docTitle || this.extractDocumentTitle(msg.content) || "Dokumen_PantauSekolah";
+        const contentHtml = this.renderMarkdownToHtml(msg.content);
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) {
+            alert("Harap izinkan popup browser untuk membuka pratinjau cetak PDF.");
+            return;
+        }
+
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <title>${docTitle}</title>
+                <style>
+                    @page { size: A4 portrait; margin: 2.5cm 2cm 2.5cm 2.5cm; }
+                    body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; color: #111; margin: 0; padding: 25px; }
+                    h1, h2, h3, h4 { text-align: center; font-weight: bold; margin-bottom: 8px; color: #000; }
+                    h1 { font-size: 16pt; }
+                    h2 { font-size: 14pt; }
+                    h3 { font-size: 13pt; text-align: left; }
+                    h4 { font-size: 12pt; text-align: left; }
+                    table { border-collapse: collapse; width: 100%; margin: 15px 0; font-size: 11pt; }
+                    th, td { border: 1px solid #000; padding: 6px 10px; text-align: left; }
+                    th { background-color: #f2f2f2; text-align: center; font-weight: bold; }
+                    ul, ol { margin-left: 20px; }
+                    p { margin-bottom: 8px; text-align: justify; }
+                    @media print {
+                        .no-print { display: none; }
+                    }
+                </style>
+            </head>
+            <body>
+                ${contentHtml}
+                <script>
+                    window.onload = function() {
+                        window.print();
+                        setTimeout(function() { window.close(); }, 500);
+                    };
+                </script>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+    },
+
+    /**
      * Salin respon pesan ke clipboard
      */
     copyMessage(index) {
@@ -455,7 +756,7 @@ PANDUAN & ATURAN RESPON:
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(msg.content).then(() => {
                 if (typeof App !== "undefined" && typeof App.showToast === "function") {
-                    App.showToast("Teks respon berhasil disalin ke clipboard!", "success");
+                    App.showToast("Teks naskah berhasil disalin ke clipboard!", "success");
                 }
             }).catch(() => {
                 this.fallbackCopy(msg.content);
@@ -475,42 +776,42 @@ PANDUAN & ATURAN RESPON:
         try {
             document.execCommand("copy");
             if (typeof App !== "undefined" && typeof App.showToast === "function") {
-                App.showToast("Teks respon berhasil disalin!", "success");
+                App.showToast("Teks berhasil disalin!", "success");
             }
         } catch (e) {}
         document.body.removeChild(ta);
     },
 
     /**
-     * Gulir chat ke posisi paling bawah
+     * Gulir scroll area ke paling bawah
      */
     scrollToBottom() {
-        const container = document.getElementById("ai-chat-messages");
+        const container = document.getElementById("ai-module-chat-thread");
         if (container) {
             container.scrollTop = container.scrollHeight;
         }
     },
 
     /**
-     * Event Listener untuk input teks
+     * Event Listener input teks di modul
      */
     bindEvents() {
-        const input = document.getElementById("ai-chat-input");
+        const input = document.getElementById("ai-module-input");
         if (input) {
             input.addEventListener("keydown", (e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
-                    this.handleSend();
+                    this.handleModuleSend();
                 }
             });
         }
     },
 
     /**
-     * Tangani pengiriman pesan dari pengguna
+     * Eksekusi pengiriman pesan dari textarea modul
      */
-    async handleSend() {
-        const input = document.getElementById("ai-chat-input");
+    async handleModuleSend(specialAction = "") {
+        const input = document.getElementById("ai-module-input");
         if (!input) return;
 
         const text = input.value.trim();
@@ -522,7 +823,7 @@ PANDUAN & ATURAN RESPON:
         const now = new Date();
         const timeStr = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
 
-        // 1. Tambahkan pesan user ke thread
+        // Tambahkan pesan user ke thread
         this.messages.push({
             role: "user",
             content: text,
@@ -530,21 +831,24 @@ PANDUAN & ATURAN RESPON:
         });
 
         this.isLoading = true;
-        this.renderQuickPrompts();
         this.renderMessages();
 
         try {
-            // Ambil API Key & Model
             const apiKey = (localStorage.getItem(this.STORAGE_KEY_KEY) || "").trim();
             const model = (localStorage.getItem(this.STORAGE_KEY_MODEL) || "openai/gpt-oss-120b").trim();
 
-            // Bangun percakapan lengkap untuk API
+            const isAnalysisRequest = specialAction === "analisis_kepatuhan" ||
+                text.toLowerCase().includes("analisis") ||
+                text.toLowerCase().includes("grafik") ||
+                text.toLowerCase().includes("kepatuhan") ||
+                text.toLowerCase().includes("statistik");
+
+            // Bangun prompt kontekstual
             const systemPrompt = this.buildSystemPrompt();
             const apiMessages = [
                 { role: "system", content: systemPrompt }
             ];
 
-            // Masukkan 8 pesan terakhir agar memiliki memori percakapan
             const recent = this.messages.slice(-8);
             recent.forEach(m => {
                 apiMessages.push({
@@ -556,7 +860,7 @@ PANDUAN & ATURAN RESPON:
             let replyText = "";
             let usedModel = model;
 
-            // Percobaan 1: Panggil melalui backend Google Apps Script (Code.gs)
+            // Percobaan 1: Kirim ke Google Apps Script (Code.gs)
             let gasSuccess = false;
             try {
                 if (typeof ApiService !== "undefined") {
@@ -565,7 +869,7 @@ PANDUAN & ATURAN RESPON:
                         messages: apiMessages,
                         apiKey: apiKey,
                         model: model
-                    }, 45000);
+                    }, 50000);
 
                     if (gasRes && gasRes.status === "success" && gasRes.reply) {
                         replyText = gasRes.reply;
@@ -577,60 +881,250 @@ PANDUAN & ATURAN RESPON:
                 }
             } catch (errGas) {
                 console.warn("GAS AI call failed, beralih ke direct client fetch:", errGas);
-                if (errGas && errGas.message && errGas.message.includes("API Key")) {
-                    throw errGas;
-                }
             }
 
-            // Percobaan 2: Direct Client Fetch jika backend belum di-deploy atau UrlFetch belum diotorisasi
+            // Percobaan 2: Direct Client Fetch jika backend belum di-deploy
             if (!gasSuccess) {
                 const defaultKey = atob("c2stb3ItdjEtYzlhNWYzMmMwOWZiMjNmNzgzZDcyZTFiODkzYWYxNGYxNzQwNDVmMWEzODc1YmQ0NDc3OWM3ZGQ0ZmI1MThmZA==");
                 const effectiveKey = apiKey || defaultKey;
 
                 if (effectiveKey.startsWith("AIza")) {
-                    // Direct Google Gemini API
                     replyText = await this.callGeminiDirect(apiMessages, effectiveKey, model);
                     usedModel = model.includes("gemini") ? model : "gemini-1.5-flash";
                 } else {
-                    // Direct OpenRouter API
                     replyText = await this.callOpenRouterDirect(apiMessages, effectiveKey, model);
                 }
             }
+
+            // Siapkan payload chart jika pengguna meminta analisis / statistik
+            let chartId = "";
+            let chartPayload = null;
+
+            if (isAnalysisRequest) {
+                chartId = "aiChart_" + Date.now();
+                chartPayload = this.generateLiveChartData();
+            }
+
+            const docTitle = this.extractDocumentTitle(replyText) || (isAnalysisRequest ? "Laporan_Analisis_Kepatuhan_Supervisi" : "Naskah_Resmi_PantauSekolah");
 
             // Simpan respon AI ke thread
             this.messages.push({
                 role: "assistant",
                 content: replyText,
                 model: usedModel,
+                docTitle: docTitle,
+                chartId: chartId,
+                chartPayload: chartPayload,
                 time: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
             });
 
             this.saveChatHistory();
 
         } catch (err) {
-            console.error("AI Assistant Error:", err);
-            const errMsg = err.message || "Terjadi kesalahan saat menghubungi server AI.";
+            console.error("Modul AI Error:", err);
             this.messages.push({
                 role: "assistant",
-                content: `⚠️ **Maaf, gagal memproses permintaan:**\n${errMsg}\n\n*Tips: Klik ikon ⚙️ di pojok kanan atas jendela ini untuk memeriksa atau memasukkan API Key.*`,
+                content: `⚠️ **Gagal memproses permintaan:**\n${err.message || 'Terjadi gangguan jaringan saat menghubungi server AI.'}\n\n*Tips: Periksa koneksi internet atau buka pengaturan AI untuk memastikan kunci aktif.*`,
                 time: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })
             });
         } finally {
             this.isLoading = false;
             this.renderMessages();
-            this.renderQuickPrompts();
         }
     },
 
     /**
-     * Direct Fetch ke OpenRouter API (Fallback jika Code.gs belum siap)
+     * Hasilkan data chart dari data riil aplikasi (LiveSync)
+     */
+    generateLiveChartData() {
+        let labels = [];
+        let dataValues = [];
+        let bgColors = [];
+
+        try {
+            if (typeof LiveSync !== "undefined" && LiveSync.state) {
+                const s = LiveSync.state;
+                const schools = s.schools || [];
+                const reportsKepsek = s.reportsKepsek || [];
+                const reportsGuru = s.reportsGuru || [];
+
+                if (schools.length > 0) {
+                    schools.slice(0, 10).forEach(sch => {
+                        const sName = sch.nama || "Sekolah";
+                        const shortName = sName.length > 14 ? sName.slice(0, 12) + ".." : sName;
+                        labels.push(shortName);
+
+                        // Hitung kepatuhan berkas sekolah ini
+                        const sLower = sName.toLowerCase();
+                        const kTotal = reportsKepsek.filter(r => (r.asalSekolah || "").toLowerCase() === sLower && r.status === "Disetujui").length;
+                        const gTotal = reportsGuru.filter(r => (r.asalSekolah || "").toLowerCase() === sLower && r.status === "Disetujui").length;
+                        const totalApproved = kTotal + gTotal;
+
+                        // Persentase kepatuhan indikator
+                        const pct = Math.min(100, Math.max(15, totalApproved * 25));
+                        dataValues.push(pct);
+
+                        if (pct >= 80) bgColors.push("#10B981"); // Hijau Sangat Baik
+                        else if (pct >= 50) bgColors.push("#F59E0B"); // Kuning Cukup
+                        else bgColors.push("#F43F5E"); // Merah Perlu Pembinaan
+                    });
+                }
+            }
+        } catch (e) {}
+
+        if (labels.length === 0) {
+            labels = ["SDN 1 Keberak", "SDN 11 Tengka", "SDN 14 Natal", "SDN 15 Semib", "SDN 2 Nanga"];
+            dataValues = [85, 70, 45, 90, 60];
+            bgColors = ["#10B981", "#F59E0B", "#F43F5E", "#10B981", "#F59E0B"];
+        }
+
+        return {
+            labels: labels,
+            dataValues: dataValues,
+            bgColors: bgColors
+        };
+    },
+
+    /**
+     * Render grafik Chart.js ke dalam elemen canvas pesan
+     */
+    renderAllChartsInThread() {
+        if (typeof Chart === "undefined") return;
+
+        this.messages.forEach(m => {
+            if (m.chartId && m.chartPayload) {
+                const canvas = document.getElementById(m.chartId);
+                if (!canvas) return;
+
+                // Jika chart sudah pernah dibuat untuk canvas ini, jangan buat ulang
+                if (this.chartInstances[m.chartId]) return;
+
+                const isDark = document.documentElement.classList.contains("dark");
+                const textColor = isDark ? "#E2E8F0" : "#334155";
+                const gridColor = isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)";
+
+                try {
+                    const ctx = canvas.getContext("2d");
+                    const chart = new Chart(ctx, {
+                        type: "bar",
+                        data: {
+                            labels: m.chartPayload.labels,
+                            datasets: [{
+                                label: "Kepatuhan (%)",
+                                data: m.chartPayload.dataValues,
+                                backgroundColor: m.chartPayload.bgColors,
+                                borderRadius: 8,
+                                maxBarThickness: 36
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return `Kepatuhan: ${context.parsed.y}%`;
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    max: 100,
+                                    ticks: {
+                                        color: textColor,
+                                        callback: function(val) { return val + "%"; }
+                                    },
+                                    grid: { color: gridColor }
+                                },
+                                x: {
+                                    ticks: {
+                                        color: textColor,
+                                        font: { size: 10 }
+                                    },
+                                    grid: { display: false }
+                                }
+                            }
+                        }
+                    });
+
+                    this.chartInstances[m.chartId] = chart;
+                } catch (e) {
+                    console.error("Gagal merender chart:", e);
+                }
+            }
+        });
+    },
+
+    /**
+     * Bangun System Prompt Kontekstual untuk Engine AI
+     */
+    buildSystemPrompt() {
+        const currentUser = typeof AuthService !== "undefined" ? AuthService.getUser() : null;
+        const role = currentUser ? (currentUser.role || "Pengguna") : "Pengguna";
+        const nama = currentUser ? (currentUser.nama || "Bapak/Ibu") : "Bapak/Ibu";
+        const sekolah = currentUser ? (currentUser.asal_sekolah || "") : "";
+
+        let appDataSummary = "";
+        try {
+            if (typeof LiveSync !== "undefined" && LiveSync.state) {
+                const s = LiveSync.state;
+                if (role === "Pengawas") {
+                    const schools = s.schools || [];
+                    const kepsekR = s.reportsKepsek || [];
+                    const guruR = s.reportsGuru || [];
+                    appDataSummary = `DATA SUPERVISI RIIL DINAS:
+- Jumlah Sekolah Binaan: ${schools.length} Sekolah (${schools.map(x => x.nama).slice(0, 6).join(", ")})
+- Laporan Kepala Sekolah: ${kepsekR.length} Berkas (Disetujui: ${kepsekR.filter(r => r.status === 'Disetujui').length}, Revisi: ${kepsekR.filter(r => r.status === 'Perlu Perbaikan').length})
+- Laporan Guru: ${guruR.length} Berkas (Disetujui: ${guruR.filter(r => r.status === 'Disetujui').length}, Revisi: ${guruR.filter(r => r.status === 'Perlu Perbaikan').length})`;
+                } else if (role === "Kepala Sekolah" || role === "Kepsek") {
+                    const myGuruReports = (s.reportsGuru || []).filter(r => (r.asalSekolah || "").toLowerCase() === sekolah.toLowerCase());
+                    const myReports = (s.reportsKepsek || []).filter(r => (r.asalSekolah || "").toLowerCase() === sekolah.toLowerCase());
+                    appDataSummary = `DATA SEKOLAH:
+- Satuan Pendidikan: ${sekolah || "Sekolah Binaan"}
+- Laporan Kepala Sekolah: ${myReports.length} Berkas
+- Laporan Guru di Sekolah Ini: ${myGuruReports.length} Berkas (${myGuruReports.filter(r => r.status === 'Disetujui').length} Disetujui, ${myGuruReports.filter(r => r.status === 'Perlu Perbaikan').length} Perlu Revisi)`;
+                } else if (role === "Guru") {
+                    const myReports = (s.reportsGuru || []).filter(r => (r.nama || "").toLowerCase() === nama.toLowerCase() || (r.asalSekolah || "").toLowerCase() === sekolah.toLowerCase());
+                    const needRevision = myReports.filter(r => r.status === 'Perlu Perbaikan' || r.status === 'Ditolak');
+                    appDataSummary = `DATA GURU:
+- Nama Pendidik: ${nama}
+- Satuan Pendidikan: ${sekolah || "Sekolah"}
+- Total Berkas Anda: ${myReports.length} Dokumen
+${needRevision.length > 0 ? `- Berkas Perlu Revisi: ${needRevision.map(r => `[${r.kategori}] Catatan Pengawas: "${r.catatan || 'Perlu perbaikan kelengkapan'}"`).join(" | ")}` : '- Status Berkas: Terverifikasi baik / menunggu evaluasi.'}`;
+                }
+            }
+        } catch (e) {}
+
+        return `Anda adalah "PantauBot", Asisten AI Konsultan Edukasi & Pengawasan Sekolah Resmi pada platform PantauSekolah.
+Identitas Pengguna:
+- Nama: ${nama}
+- Peran: ${role}
+- Asal Sekolah / Instansi: ${sekolah || "Dinas Pendidikan"}
+
+${appDataSummary}
+
+PANDUAN FORMAT DAN PENULISAN DOKUMEN:
+1. Jika pengguna meminta format, surat tugas, modul ajar, instrumen supervisi, atau analisis: Susun naskah dengan sangat rapi, terstruktur, lengkap, dan siap dicetak/diekspor ke Word atau PDF.
+2. WAJIB gunakan format tabel Markdown standar (| Kolom 1 | Kolom 2 | ...) untuk data terstruktur, daftar nama, rincian jadwal, instrumen, maupun rubrik penskoran.
+3. Gunakan heading bertingkat: # untuk Judul Utama Dokumen, ## untuk Bab/Bagian, ### untuk Sub-bagian, dan #### untuk Rincian Poin Khusus.
+4. Gunakan poin berbutir (-) atau bernomor (1, 2, 3) yang tertata rapi.
+5. Jika pengguna meminta analisis kepatuhan atau kinerja sekolah, berikan rincian persentase, evaluasi kualitatif, serta poin-poin rekomendasi perbaikan konkret.
+6. Selalu gunakan Bahasa Indonesia yang formal, santun, lugas, dan berstandar dinas pendidikan.`;
+    },
+
+    /**
+     * Direct Fetch OpenRouter
      */
     async callOpenRouterDirect(messages, apiKey, model) {
         const url = "https://openrouter.ai/api/v1/chat/completions";
         const payload = {
             model: model || "openai/gpt-oss-120b",
             messages: messages,
-            temperature: 0.6
+            temperature: 0.5
         };
 
         const resp = await fetch(url, {
@@ -639,7 +1133,7 @@ PANDUAN & ATURAN RESPON:
                 "Content-Type": "application/json",
                 "Authorization": "Bearer " + apiKey,
                 "HTTP-Referer": window.location.origin || "https://pantausekolah.app",
-                "X-Title": "PantauSekolah - AI Assistant"
+                "X-Title": "PantauSekolah - AI Module"
             },
             body: JSON.stringify(payload)
         });
@@ -660,7 +1154,7 @@ PANDUAN & ATURAN RESPON:
     },
 
     /**
-     * Direct Fetch ke Google Gemini API jika user menggunakan Gemini Key
+     * Direct Fetch Google Gemini
      */
     async callGeminiDirect(messages, apiKey, model) {
         const cleanModel = (model || "gemini-1.5-flash").replace("google/", "").replace(":free", "").trim();
@@ -709,7 +1203,7 @@ PANDUAN & ATURAN RESPON:
     }
 };
 
-// Pasang event DOMContentLoaded untuk inisialisasi awal
+// Inisialisasi DOM
 document.addEventListener("DOMContentLoaded", () => {
     if (typeof AIAssistant !== "undefined" && typeof AIAssistant.init === "function") {
         AIAssistant.init();

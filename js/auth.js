@@ -159,6 +159,10 @@ const AuthService = {
             if (el) el.classList.add("hidden");
         });
 
+        // Modul Asisten AI tersedia untuk SEMUA Peran (Pengawas, Kepala Sekolah, dan Guru)
+        const navAiAssistant = document.getElementById("nav-ai-assistant");
+        if (navAiAssistant) navAiAssistant.classList.remove("hidden");
+
         if (role === "Pengawas") {
             // Pengawas: Admin Utama
             if (typeof ReportManager !== "undefined") {

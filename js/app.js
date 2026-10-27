@@ -86,7 +86,8 @@ const App = {
             'user-manager',
             'guru-manager',
             'drive-manager',
-            'audit-log'
+            'audit-log',
+            'ai-assistant'
         ];
 
         // Validasi modul apakah terdaftar
@@ -97,12 +98,12 @@ const App = {
 
         // Cek izin peran (role-based guard) agar tab tidak bisa diakses sembarangan
         if (role === "Guru") {
-            const allowedGuruTabs = ['dashboard', 'verifikasi-guru', 'upload'];
+            const allowedGuruTabs = ['dashboard', 'verifikasi-guru', 'upload', 'ai-assistant'];
             if (!allowedGuruTabs.includes(targetTab)) {
                 targetTab = 'dashboard';
             }
         } else if (role === "Kepala Sekolah" || role === "Kepsek") {
-            const allowedKepsekTabs = ['dashboard', 'verifikasi-kepsek', 'verifikasi-guru', 'folder-sekolah', 'upload', 'guru-manager'];
+            const allowedKepsekTabs = ['dashboard', 'verifikasi-kepsek', 'verifikasi-guru', 'folder-sekolah', 'upload', 'guru-manager', 'ai-assistant'];
             if (!allowedKepsekTabs.includes(targetTab)) {
                 targetTab = 'dashboard';
             }
@@ -192,7 +193,7 @@ const App = {
 
                 this.switchTab('dashboard');
                 if (typeof AIAssistant !== "undefined") {
-                    AIAssistant.renderQuickPrompts();
+                    AIAssistant.renderActionCards();
                     AIAssistant.renderMessages();
                 }
                 this.showToast(`Selamat datang, ${res.nama}!`, "success");
@@ -365,7 +366,8 @@ const App = {
             'user-manager',
             'guru-manager',
             'drive-manager',
-            'audit-log'
+            'audit-log',
+            'ai-assistant'
         ];
 
         tabs.forEach(tab => {
@@ -495,6 +497,12 @@ const App = {
             subTitleEl.innerText = "Penyusunan dokumen resmi, matriks kepatuhan sekolah binaan, serta cetak laporan ke Kepala Dinas";
             if (typeof DinasReportManager !== "undefined") {
                 DinasReportManager.init();
+            }
+        } else if (tabName === 'ai-assistant') {
+            titleEl.innerText = "Modul Asisten AI & Konsultasi Edukasi";
+            subTitleEl.innerText = "Konsultasi kurikulum, analisis kepatuhan berbasis grafik visual, pembuatan draf naskah resmi, dan ekspor Word & PDF";
+            if (typeof AIAssistant !== "undefined") {
+                AIAssistant.onTabActivated();
             }
         }
     },
