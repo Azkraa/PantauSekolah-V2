@@ -324,20 +324,42 @@ const App = {
         });
 
         if (confirmed) {
-            if (typeof AIAssistant !== "undefined") {
-                AIAssistant.toggleChat(false);
+            try {
+                if (typeof AIAssistant !== "undefined" && typeof AIAssistant.toggleChat === "function") {
+                    AIAssistant.toggleChat(false);
+                }
+            } catch (e) {
+                console.warn("AIAssistant cleanup ignored:", e);
             }
-            AuthService.clearSession();
+
+            try {
+                AuthService.clearSession();
+            } catch (e) {
+                console.error("AuthService clearSession error:", e);
+            }
+
             try {
                 localStorage.removeItem("pantausekolah_active_tab");
                 localStorage.removeItem("pantausekolah_selected_school");
                 localStorage.removeItem("pantausekolah_folder_sekolah_school");
             } catch (e) {}
-            document.documentElement.classList.remove("has-session");
-            document.getElementById("dashboard-section").classList.add("hidden");
-            document.getElementById("login-section").classList.remove("hidden");
-            document.getElementById("input-username").value = "";
-            document.getElementById("input-password").value = "";
+
+            try {
+                document.documentElement.classList.remove("has-session");
+                const dash = document.getElementById("dashboard-section");
+                const login = document.getElementById("login-section");
+                if (dash) dash.classList.add("hidden");
+                if (login) login.classList.remove("hidden");
+                const u = document.getElementById("input-username");
+                const p = document.getElementById("input-password");
+                if (u) u.value = "";
+                if (p) p.value = "";
+            } catch (e) {
+                console.error("DOM switch error during logout:", e);
+                window.location.reload();
+                return;
+            }
+
             this.showToast("Anda telah berhasil keluar.", "success");
         }
     },

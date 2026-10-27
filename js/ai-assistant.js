@@ -22,6 +22,13 @@ const AIAssistant = {
     chartInstances: {},
 
     /**
+     * Compatibility shim (sebelumnya floating chat widget)
+     */
+    toggleChat(isOpen) {
+        // Asisten AI kini merupakan modul tab penuh (tab-ai-assistant)
+    },
+
+    /**
      * Inisialisasi awal saat aplikasi dimuat
      */
     init() {
