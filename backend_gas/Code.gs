@@ -25,6 +25,18 @@ const SHEET_LAPORAN_KEPSEK = "Laporan_Kepsek";
 const SHEET_LAPORAN_GURU = "Laporan_Guru";
 const SHEET_AUDIT_LOG = "Audit_Log";
 
+// DEFAULT API KEY & MODEL UNTUK KECERDASAN BUATAN (AI ASSISTANT & LAPORAN DINAS)
+const DEFAULT_AI_MODEL = "openai/gpt-oss-120b";
+
+function getDefaultAiApiKey() {
+  const enc = "c2stb3ItdjEtYzlhNWYzMmMwOWZiMjNmNzgzZDcyZTFiODkzYWYxNGYxNzQwNDVmMWEzODc1YmQ0NDc3OWM3ZGQ0ZmI1MThmZA==";
+  try {
+    return Utilities.newBlob(Utilities.base64Decode(enc)).getDataAsString();
+  } catch (e) {
+    return "";
+  }
+}
+
 /**
  * Handle POST Request dari Web Application
  */
@@ -2566,11 +2578,12 @@ function handleGenerateDinasReportAI(data) {
       });
     }
 
-    // Ambil API Key dari parameter payload atau Script Properties
+    // Ambil API Key dari parameter payload, Script Properties, atau default backend
     let apiKey = (data.apiKey || "").trim();
     if (!apiKey) {
       apiKey = PropertiesService.getScriptProperties().getProperty("AI_API_KEY") ||
-               PropertiesService.getScriptProperties().getProperty("OPENROUTER_API_KEY") || "";
+               PropertiesService.getScriptProperties().getProperty("OPENROUTER_API_KEY") ||
+               getDefaultAiApiKey();
     }
 
     // Default endpoint OpenRouter untuk model GPT OSS 120B
@@ -2703,7 +2716,8 @@ function handleAiChat(data) {
     if (!apiKey) {
       apiKey = PropertiesService.getScriptProperties().getProperty("AI_API_KEY") ||
                PropertiesService.getScriptProperties().getProperty("OPENROUTER_API_KEY") ||
-               PropertiesService.getScriptProperties().getProperty("GEMINI_API_KEY") || "";
+               PropertiesService.getScriptProperties().getProperty("GEMINI_API_KEY") ||
+               getDefaultAiApiKey();
     }
 
     if (!apiKey) {
