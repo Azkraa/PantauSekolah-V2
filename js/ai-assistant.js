@@ -462,17 +462,51 @@ const AIAssistant = {
 
     /**
      * Parse teks Markdown menjadi HTML berstandar dokumen resmi:
+     * - Sanitasi otomatis tag HTML teknis (<a name="..."></a>, [Judul](#anchor))
      * - Tabel bergaris rapi (table, thead, tbody, th, td)
      * - Headings H1 - H6 (termasuk ####)
+     * - Judul bagian resmi bernomor (1. Identitas Modul) / huruf (A. Identitas)
      * - Lists, bolds, italics, quotes, hr
      */
     renderMarkdownToHtml(markdown) {
         if (!markdown) return "";
 
-        const lines = markdown.split("\n");
+        // Sanitasi & Normalisasi Dokumen sebelum di-parse
+        let cleanMarkdown = markdown
+            // 1. Bersihkan seluruh tag HTML anchor mentah (<a name="..."></a>, <a id="..."></a>, dll)
+            .replace(/<a\b[^>]*>(.*?)<\/a>/gi, "$1")
+            .replace(/<a\b[^>]*\/?>/gi, "")
+            .replace(/<\/a>/gi, "")
+            // 2. Bersihkan tag formatting HTML teknis yang mungkin disisipkan model
+            .replace(/<(span|div|font)\b[^>]*>(.*?)<\/\1>/gi, "$2")
+            .replace(/<\/?(span|div|font)\b[^>]*>/gi, "")
+            // 3. Bersihkan tautan daftar isi internal: [Teks](#anchor) -> Teks
+            .replace(/\[([^\]]+)\]\(#[^\)]+\)/g, "$1")
+            // 4. Bersihkan tautan markdown eksternal jika ada: [Teks](url) -> Teks
+            .replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, "$1");
+
+        const lines = cleanMarkdown.split("\n");
         let htmlOut = [];
         let inTable = false;
         let tableRows = [];
+        let inToc = false;
+
+        // Helper untuk mengenali apakah nomor/huruf merupakan Header Bagian Utama Dokumen Resmi
+        const isMajorSectionHeading = (title) => {
+            const cleanTitle = title.replace(/<[^>]+>/g, "").trim();
+            if (cleanTitle.length > 85) return false;
+            const keywords = [
+                "IDENTITAS", "CAPAIAN", "KOMPETENSI", "TUJUAN", "PROFIL", "SARANA", "TARGET",
+                "MODEL", "PEMAHAMAN", "PERTANYAAN", "PERSIAPAN", "LANGKAH", "KEGIATAN",
+                "ASESMEN", "PENGAYAAN", "REMEDIAL", "REFLEKSI", "LAMPIRAN", "GLOSARIUM",
+                "DAFTAR PUSTAKA", "MEDIA", "SUMBER", "ALAT", "MATERI", "PENDAHULUAN",
+                "PELAKSANAAN", "PENUTUP", "HASIL", "KESIMPULAN", "REKOMENDASI", "DASAR HUKUM",
+                "KOMPONEN", "METODE", "PENILAIAN", "URAIAN", "JADWAL", "PESERTA", "ALOKASI",
+                "RINGKASAN", "LATAR BELAKANG", "SASARAN", "STRATEGI", "TINDAK LANJUT"
+            ];
+            const upper = cleanTitle.toUpperCase();
+            return keywords.some(k => upper.includes(k));
+        };
 
         const flushTable = () => {
             if (tableRows.length === 0) return;
@@ -527,13 +561,37 @@ const AIAssistant = {
                 flushTable();
             }
 
+            // Deteksi judul Daftar Isi
+            if (/^#+\s+.*daftar\s+isi/i.test(trimmed) || /^\*\*daftar\s+isi\*\*/i.test(trimmed)) {
+                inToc = true;
+                htmlOut.push(`<div class="mt-4 mb-2 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800">
+                    <h4 class="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-2 mb-2">
+                        <i class="fa-solid fa-list-ul text-indigo-600 dark:text-indigo-400"></i> Daftar Isi Dokumen
+                    </h4>`);
+                continue;
+            }
+
+            // Jika dalam blok daftar isi dan ada baris kosong atau heading baru, tutup TOC
+            if (inToc) {
+                if (trimmed === "" || /^#+\s+/.test(trimmed) || /^(\*\*\*|---|___)$/.test(trimmed)) {
+                    inToc = false;
+                    htmlOut.push(`</div>`);
+                } else if (/^(\d+|[-*])\s*[.)]\s*(.*)$/.test(trimmed)) {
+                    const match = trimmed.match(/^(\d+|[-*])\s*[.)]\s*(.*)$/);
+                    htmlOut.push(`<div class="flex items-center justify-between text-xs py-1 border-b border-dashed border-slate-200 dark:border-slate-800/80 text-slate-700 dark:text-slate-300">
+                        <span class="font-medium">${this.formatInlineMarkdown(match[2])}</span>
+                        <span class="text-slate-400 text-[10px] font-mono">Bagian ${match[1]}</span>
+                    </div>`);
+                    continue;
+                }
+            }
+
             // 2. Headings (H1 - H6)
             if (/^######\s+(.*)$/.test(trimmed)) {
                 htmlOut.push(`<h6 class="text-xs font-bold text-slate-700 dark:text-slate-300 mt-2 mb-1">${this.formatInlineMarkdown(trimmed.replace(/^######\s+/, ''))}</h6>`);
             } else if (/^#####\s+(.*)$/.test(trimmed)) {
                 htmlOut.push(`<h5 class="text-xs font-bold text-indigo-600 dark:text-indigo-400 mt-2.5 mb-1">${this.formatInlineMarkdown(trimmed.replace(/^#####\s+/, ''))}</h5>`);
             } else if (/^####\s+(.*)$/.test(trimmed)) {
-                // Selesaikan masalah raw #### pada gambar user
                 htmlOut.push(`<h4 class="text-sm font-extrabold text-indigo-700 dark:text-indigo-300 mt-3.5 mb-1.5 flex items-center gap-1.5"><i class="fa-solid fa-angle-right text-xs text-indigo-500"></i> ${this.formatInlineMarkdown(trimmed.replace(/^####\s+/, ''))}</h4>`);
             } else if (/^###\s+(.*)$/.test(trimmed)) {
                 htmlOut.push(`<h3 class="text-base font-extrabold text-slate-900 dark:text-white mt-4 mb-2 pb-1 border-b border-slate-100 dark:border-slate-800">${this.formatInlineMarkdown(trimmed.replace(/^###\s+/, ''))}</h3>`);
@@ -542,24 +600,54 @@ const AIAssistant = {
             } else if (/^#\s+(.*)$/.test(trimmed)) {
                 htmlOut.push(`<h1 class="text-xl font-black text-slate-900 dark:text-white mt-5 mb-2.5 text-center">${this.formatInlineMarkdown(trimmed.replace(/^#\s+/, ''))}</h1>`);
             }
-            // 3. Blockquotes
+            // 3. BAB I / BAB II Heading
+            else if (/^(BAB\s+[IVXLCDM]+)\s*[:.-]?\s*(.*)$/i.test(trimmed)) {
+                const match = trimmed.match(/^(BAB\s+[IVXLCDM]+)\s*[:.-]?\s*(.*)$/i);
+                htmlOut.push(`<div class="mt-5 mb-2 text-center">
+                    <h2 class="text-base sm:text-lg font-black uppercase tracking-wider text-slate-900 dark:text-white">${this.formatInlineMarkdown(match[1])}</h2>
+                    ${match[2] ? `<h3 class="text-sm sm:text-base font-extrabold text-indigo-700 dark:text-indigo-300 uppercase">${this.formatInlineMarkdown(match[2])}</h3>` : ''}
+                </div>`);
+            }
+            // 4. Huruf Besar Formal: A. Identitas Modul / B. Komponen Inti
+            else if (/^([A-Z])\.\s+(.*)$/.test(trimmed)) {
+                const match = trimmed.match(/^([A-Z])\.\s+(.*)$/);
+                if (isMajorSectionHeading(match[2])) {
+                    htmlOut.push(`<div class="mt-4 mb-2 pb-1 border-b border-indigo-200/80 dark:border-indigo-800/80 flex items-center gap-2.5">
+                        <span class="w-6 h-6 rounded-lg bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 font-black text-xs flex items-center justify-center flex-shrink-0 shadow-2xs">${match[1]}</span>
+                        <h3 class="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white">${this.formatInlineMarkdown(match[2])}</h3>
+                    </div>`);
+                } else {
+                    htmlOut.push(`<div class="flex items-start gap-2.5 ml-2 sm:ml-4 my-1 text-slate-700 dark:text-slate-200">
+                        <span class="text-indigo-600 dark:text-indigo-400 font-bold min-w-[20px] text-right">${match[1]}.</span>
+                        <div class="flex-1 leading-relaxed">${this.formatInlineMarkdown(match[2])}</div>
+                    </div>`);
+                }
+            }
+            // 5. Blockquotes
             else if (/^>\s+(.*)$/.test(trimmed)) {
                 htmlOut.push(`<blockquote class="border-l-4 border-indigo-500 bg-indigo-50/40 dark:bg-indigo-950/20 px-3.5 py-2.5 rounded-r-xl my-2 text-slate-700 dark:text-slate-300 italic text-xs leading-relaxed">${this.formatInlineMarkdown(trimmed.replace(/^>\s+/, ''))}</blockquote>`);
             }
-            // 4. Horizontal Rules
+            // 6. Horizontal Rules
             else if (/^(\*\*\*|---|___)$/.test(trimmed)) {
                 htmlOut.push('<hr class="my-4 border-t border-slate-200 dark:border-slate-800">');
             }
-            // 5. Bullet Lists (- atau *)
+            // 7. Bullet Lists (- atau *)
             else if (/^[-*]\s+(.*)$/.test(trimmed)) {
                 htmlOut.push(`<div class="flex items-start gap-2 ml-3 my-1 text-slate-700 dark:text-slate-200"><span class="text-indigo-500 font-bold mt-0.5">•</span><div class="flex-1">${this.formatInlineMarkdown(trimmed.replace(/^[-*]\s+/, ''))}</div></div>`);
             }
-            // 6. Numbered Lists (1. 2. dll)
+            // 8. Numbered Lists (1. 2. dll) atau Judul Bagian Utama Berangka (1. Identitas Modul)
             else if (/^(\d+)\.\s+(.*)$/.test(trimmed)) {
                 const match = trimmed.match(/^(\d+)\.\s+(.*)$/);
-                htmlOut.push(`<div class="flex items-start gap-2 ml-3 my-1 text-slate-700 dark:text-slate-200"><span class="text-indigo-600 dark:text-indigo-400 font-bold min-w-[18px] text-right">${match[1]}.</span><div class="flex-1">${this.formatInlineMarkdown(match[2])}</div></div>`);
+                if (isMajorSectionHeading(match[2])) {
+                    htmlOut.push(`<div class="mt-4.5 mb-2 pb-1 border-b border-indigo-200/80 dark:border-indigo-800/80 flex items-center gap-2.5">
+                        <span class="w-6 h-6 rounded-lg bg-indigo-600 text-white font-black text-xs flex items-center justify-center flex-shrink-0 shadow-2xs">${match[1]}</span>
+                        <h3 class="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white">${this.formatInlineMarkdown(match[2])}</h3>
+                    </div>`);
+                } else {
+                    htmlOut.push(`<div class="flex items-start gap-2.5 ml-2 sm:ml-4 my-1 text-slate-700 dark:text-slate-200"><span class="text-indigo-600 dark:text-indigo-400 font-bold min-w-[20px] text-right">${match[1]}.</span><div class="flex-1">${this.formatInlineMarkdown(match[2])}</div></div>`);
+                }
             }
-            // 7. Paragraf biasa atau kosong
+            // 9. Paragraf biasa atau baris kosong
             else {
                 if (trimmed === "") {
                     htmlOut.push('<div class="h-2"></div>');
@@ -569,6 +657,7 @@ const AIAssistant = {
             }
         }
 
+        if (inToc) htmlOut.push(`</div>`);
         if (inTable) flushTable();
 
         return htmlOut.join("\n");
@@ -579,7 +668,15 @@ const AIAssistant = {
      */
     formatInlineMarkdown(str) {
         if (!str) return "";
-        let out = this.escapeHtml(str);
+
+        // Bersihkan sisa tag anchor HTML dan internal link
+        let clean = str
+            .replace(/<a\b[^>]*>(.*?)<\/a>/gi, "$1")
+            .replace(/<a\b[^>]*\/?>/gi, "")
+            .replace(/<\/a>/gi, "")
+            .replace(/\[([^\]]+)\]\(#[^\)]+\)/g, "$1");
+
+        let out = this.escapeHtml(clean);
 
         // Inline code
         out = out.replace(/`([^`]+)`/g, '<code class="bg-slate-100 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded font-mono text-[11px]">$1</code>');
@@ -1111,9 +1208,14 @@ PANDUAN FORMAT DAN PENULISAN DOKUMEN:
 1. Jika pengguna meminta format, surat tugas, modul ajar, instrumen supervisi, atau analisis: Susun naskah dengan sangat rapi, terstruktur, lengkap, dan siap dicetak/diekspor ke Word atau PDF.
 2. WAJIB gunakan format tabel Markdown standar (| Kolom 1 | Kolom 2 | ...) untuk data terstruktur, daftar nama, rincian jadwal, instrumen, maupun rubrik penskoran.
 3. Gunakan heading bertingkat: # untuk Judul Utama Dokumen, ## untuk Bab/Bagian, ### untuk Sub-bagian, dan #### untuk Rincian Poin Khusus.
-4. Gunakan poin berbutir (-) atau bernomor (1, 2, 3) yang tertata rapi.
-5. Jika pengguna meminta analisis kepatuhan atau kinerja sekolah, berikan rincian persentase, evaluasi kualitatif, serta poin-poin rekomendasi perbaikan konkret.
-6. Selalu gunakan Bahasa Indonesia yang formal, santun, lugas, dan berstandar dinas pendidikan.`;
+4. ATURAN KEBERSIHAN DOKUMEN (SANGAT KRUSIAL):
+   - DILARANG KERAS menyertakan tag HTML apa pun seperti <a name='...'></a>, <a id='...'></a>, <span>, atau tautan anchor web internal [Teks](#anchor).
+   - JANGAN membuat link navigasi internal web (#...).
+   - Jika membuat bagian "Daftar Isi", tuliskan dalam bentuk teks bernomor atau berbutir yang bersih (misal: "1. Identitas Modul", "2. Capaian Pembelajaran").
+   - Dokumen ini diperuntukkan bagi cetakan resmi kedinasan, bukan laman web Wikipedia. Pastikan teks 100% bersih dari artefak kode teknis.
+5. Gunakan poin berbutir (-) atau bernomor (1, 2, 3) yang tertata rapi.
+6. Jika pengguna meminta analisis kepatuhan atau kinerja sekolah, berikan rincian persentase, evaluasi kualitatif, serta poin-poin rekomendasi perbaikan konkret.
+7. Selalu gunakan Bahasa Indonesia yang formal, santun, lugas, dan berstandar dinas pendidikan.`;
     },
 
     /**
