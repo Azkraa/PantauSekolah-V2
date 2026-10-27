@@ -361,6 +361,11 @@ const App = {
             }
 
             this.showToast("Anda telah berhasil keluar.", "success");
+
+            // Pastikan reload bersih agar seluruh state memori bersih total
+            setTimeout(() => {
+                window.location.reload();
+            }, 350);
         }
     },
 
