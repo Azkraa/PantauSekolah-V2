@@ -191,6 +191,10 @@ const App = {
                 } catch (e) {}
 
                 this.switchTab('dashboard');
+                if (typeof AIAssistant !== "undefined") {
+                    AIAssistant.renderQuickPrompts();
+                    AIAssistant.renderMessages();
+                }
                 this.showToast(`Selamat datang, ${res.nama}!`, "success");
 
                 usernameInput.value = "";
@@ -319,6 +323,9 @@ const App = {
         });
 
         if (confirmed) {
+            if (typeof AIAssistant !== "undefined") {
+                AIAssistant.toggleChat(false);
+            }
             AuthService.clearSession();
             try {
                 localStorage.removeItem("pantausekolah_active_tab");

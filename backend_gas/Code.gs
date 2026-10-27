@@ -111,6 +111,9 @@ function doPost(e) {
       case "generate_dinas_report_ai":
         return handleGenerateDinasReportAI(data);
 
+      case "ai_chat":
+        return handleAiChat(data);
+
       default:
         return jsonResponse({ status: "error", message: "Aksi '" + action + "' tidak dikenali." });
     }
@@ -2678,6 +2681,161 @@ function handleGenerateDinasReportAI(data) {
     return jsonResponse({
       status: "error",
       message: "Kesalahan server saat memproses GPT OSS 120B: " + err.toString()
+    });
+  }
+}
+
+/**
+ * Asisten AI Percakapan Multirole (Chat PantauBot)
+ * Mendukung percakapan multi-turn, format OpenRouter, Google Gemini, dan Script Properties
+ */
+function handleAiChat(data) {
+  try {
+    const messages = data.messages || [];
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return jsonResponse({
+        status: "error",
+        message: "Pesan percakapan tidak boleh kosong."
+      });
+    }
+
+    let apiKey = (data.apiKey || "").trim();
+    if (!apiKey) {
+      apiKey = PropertiesService.getScriptProperties().getProperty("AI_API_KEY") ||
+               PropertiesService.getScriptProperties().getProperty("OPENROUTER_API_KEY") ||
+               PropertiesService.getScriptProperties().getProperty("GEMINI_API_KEY") || "";
+    }
+
+    if (!apiKey) {
+      return jsonResponse({
+        status: "error",
+        message: "API Key belum diatur. Silakan masukkan API Key di menu pengaturan AI atau simpan di Script Properties ('AI_API_KEY')."
+      });
+    }
+
+    // Dukungan Google Gemini API langsung jika API Key diawali "AIza"
+    if (apiKey.startsWith("AIza")) {
+      const geminiModel = (data.model || "gemini-1.5-flash").replace("google/", "").replace(":free", "").trim();
+      const geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/" + geminiModel + ":generateContent?key=" + apiKey;
+
+      let contents = [];
+      let systemInstruction = "";
+      messages.forEach(function(m) {
+        if (m.role === "system") {
+          systemInstruction += m.content + "\n";
+        } else {
+          contents.push({
+            role: m.role === "assistant" ? "model" : "user",
+            parts: [{ text: m.content }]
+          });
+        }
+      });
+
+      const geminiPayload = {
+        contents: contents
+      };
+      if (systemInstruction.trim()) {
+        geminiPayload.systemInstruction = {
+          parts: [{ text: systemInstruction.trim() }]
+        };
+      }
+
+      const gemOptions = {
+        method: "post",
+        contentType: "application/json",
+        payload: JSON.stringify(geminiPayload),
+        muteHttpExceptions: true
+      };
+
+      const gemResp = UrlFetchApp.fetch(geminiUrl, gemOptions);
+      const gemCode = gemResp.getResponseCode();
+      const gemText = gemResp.getContentText();
+
+      if (gemCode !== 200) {
+        let errDesc = "HTTP " + gemCode;
+        try {
+          const parsedErr = JSON.parse(gemText);
+          if (parsedErr.error && parsedErr.error.message) errDesc = parsedErr.error.message;
+        } catch(e) {}
+        return jsonResponse({ status: "error", message: "Google Gemini API error: " + errDesc });
+      }
+
+      const gemData = JSON.parse(gemText);
+      const gemReply = gemData.candidates && gemData.candidates[0] && gemData.candidates[0].content && gemData.candidates[0].content.parts && gemData.candidates[0].content.parts[0] ? gemData.candidates[0].content.parts[0].text : "";
+
+      return jsonResponse({
+        status: "success",
+        reply: gemReply.trim(),
+        model: geminiModel,
+        engine: "Google Gemini"
+      });
+    }
+
+    // Default endpoint OpenRouter
+    const apiUrl = (data.apiUrl || PropertiesService.getScriptProperties().getProperty("AI_API_URL") || "https://openrouter.ai/api/v1/chat/completions").trim();
+    let model = (data.model || PropertiesService.getScriptProperties().getProperty("AI_MODEL") || "openai/gpt-oss-120b").trim();
+    if (model.includes(":free") && !model.startsWith("google/") && !model.startsWith("meta-llama/")) {
+      model = "openai/gpt-oss-120b";
+    }
+
+    const payload = {
+      model: model,
+      messages: messages,
+      temperature: 0.6
+    };
+
+    const options = {
+      method: "post",
+      contentType: "application/json",
+      headers: {
+        "Authorization": "Bearer " + apiKey,
+        "HTTP-Referer": "https://pantausekolah.app",
+        "X-Title": "PantauSekolah - AI Assistant"
+      },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+
+    const response = UrlFetchApp.fetch(apiUrl, options);
+    const respCode = response.getResponseCode();
+    const respText = response.getContentText();
+
+    if (respCode !== 200) {
+      let errMsg = "HTTP " + respCode;
+      try {
+        const errJson = JSON.parse(respText);
+        if (errJson.error && errJson.error.message) {
+          errMsg = errJson.error.message;
+        }
+      } catch (e) {
+        errMsg = respText.slice(0, 300);
+      }
+      return jsonResponse({
+        status: "error",
+        message: "Gagal memanggil AI: " + errMsg
+      });
+    }
+
+    const result = JSON.parse(respText);
+    const candidate = result.choices && result.choices[0] && result.choices[0].message;
+    if (!candidate || !candidate.content) {
+      return jsonResponse({
+        status: "error",
+        message: "Respon AI kosong."
+      });
+    }
+
+    return jsonResponse({
+      status: "success",
+      reply: candidate.content.trim(),
+      model: model,
+      engine: "OpenRouter"
+    });
+
+  } catch (err) {
+    return jsonResponse({
+      status: "error",
+      message: "Kesalahan server saat memproses chat AI: " + err.toString()
     });
   }
 }
